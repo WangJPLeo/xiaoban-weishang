@@ -1,0 +1,41 @@
+.gitignore
+  s_c321ee639961f9::t_9d12fb6ba593ca 1-4
+arena.js
+  s_c321ee639961f9::t_837e09144b6381 1-400
+game.js
+  s_c321ee639961f9::t_f196d5031f7b63 1-796
+idea.css
+  s_c321ee639961f9::t_09ddc346a80ca9 1-56
+idea.js
+  s_c321ee639961f9::t_564471e31e6600 1-250
+index.html
+  s_c321ee639961f9::t_f58f789d0978d4 1-117
+package-lock.json
+  s_c321ee639961f9::t_d1a476033134f9 1-39
+package.json
+  s_c321ee639961f9::t_f6494f4f0c0016 1-14
+server.js
+  s_c321ee639961f9::t_d64fe495435096 1-226
+style.css
+  s_c321ee639961f9::t_68ec6b2662e9c9 1-90
+启动.command
+  s_c321ee639961f9::t_b01a1966c906fd 1-31
+说明.txt
+  s_c321ee639961f9::t_aa0dbea21606e0 1-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "523b3f15b91f91eed6ec18c5819b19b9417e5fbd",
+  "prompts": {},
+  "sessions": {
+    "s_c321ee639961f9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf0d-c7a3-7bc0-892d-262bb302ecc1",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wangjipeng01 <wangjipeng01@zhuanzhuan.com>"
+    }
+  }
+}
