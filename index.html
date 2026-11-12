@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-mode="practice">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小班微上</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="idea.css">
+  <script src="arena.js" defer></script>
+  <script src="idea.js" defer></script>
+  <script src="game.js" defer></script>
+</head>
+<body>
+  <main class="shell" id="arenaView">
+    <header class="top-bar">
+      <div class="identity">
+        <span class="brand-icon" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <div>
+          <h1>小班微上</h1>
+        </div>
+      </div>
+      <div class="top-tools">
+        <button class="idea-toggle" id="showIdea" type="button"><span>切换到 IDEA</span><kbd>F</kbd></button>
+        <div class="connection" id="connection"><span class="status-dot"></span><span id="connectionText">等待选职业</span></div>
+      </div>
+    </header>
+
+    <section class="metrics" aria-label="对局状态">
+      <div class="metric health">
+        <div><span id="playerName">我的体力</span><strong id="healthText">—</strong></div>
+        <progress id="healthBar" max="100" value="0" aria-label="我的体力"></progress>
+      </div>
+      <div class="metric"><span>我的击倒</span><strong id="score">—</strong></div>
+      <div class="metric"><span>场内人数</span><strong id="occupancy">— / 10</strong></div>
+    </section>
+
+    <section class="stage" aria-labelledby="floorTitle">
+      <div class="stage-info">
+        <h2 id="floorTitle">办公室擂台</h2>
+        <p><kbd>↑ ↓ ← →</kbd> 移动，也可点击地面</p>
+      </div>
+      <div class="queue-notice" id="queueNotice" hidden role="status">
+        <strong id="queuePosition"></strong><span>可以观战，有空位时自动进场</span>
+      </div>
+      <div class="scene">
+        <canvas id="gameCanvas" width="1152" height="592" aria-label="俯瞰像素格斗场"></canvas>
+        <div id="sceneOverlay" class="scene-overlay" aria-hidden="true"></div>
+      </div>
+      <div class="actions" id="actions" aria-label="格斗动作"></div>
+    </section>
+    <section class="standing" aria-labelledby="standingTitle">
+      <h2 id="standingTitle">击倒榜</h2>
+      <ol id="leaders"></ol>
+    </section>
+    <p id="practiceHelp" class="practice-help" hidden>双击启动脚本可开启联机房间。</p>
+  </main>
+  <dialog id="roleDialog" class="role-dialog" aria-labelledby="roleTitle">
+    <form id="roleForm">
+      <h2 id="roleTitle">选择职业</h2>
+      <fieldset>
+        <legend class="visually-hidden">职业</legend>
+        <div class="role-grid" id="roleChoices"></div>
+      </fieldset>
+      <div class="role-footer">
+        <button class="role-idea" type="button" id="roleIdea">打开 IDEA <kbd>F</kbd></button>
+        <button class="enter-fight" id="enterFight" type="submit" disabled>进入擂台</button>
+      </div>
+    </form>
+  </dialog>
+
+  <section class="idea-view" id="ideaView" aria-label="IDEA Java 工程" hidden>
+    <header class="ide-header">
+      <span class="ide-logo" aria-hidden="true">IJ</span>
+      <div class="ide-project"><strong>office-scheduler</strong><span>⌄</span></div>
+      <span class="ide-branch"><span aria-hidden="true">⑂</span> main</span>
+      <span class="ide-run"><span aria-hidden="true">▷</span> OfficeApplication</span>
+      <button id="returnArena" class="ide-return" type="button">返回游戏 <kbd>Esc</kbd></button>
+    </header>
+    <div class="ide-workspace">
+      <aside class="ide-tree" aria-label="工程文件">
+        <h2>Project</h2>
+        <div class="ide-tree-body">
+          <div class="tree-row folder">⌄ <b>▱</b> office-scheduler</div>
+          <div class="tree-row folder" style="--level:1">⌄ <b>▱</b> src</div>
+          <div class="tree-row folder" style="--level:2">⌄ <b>▱</b> main</div>
+          <div class="tree-row folder" style="--level:3">⌄ <b>▱</b> java</div>
+          <div class="tree-row folder" style="--level:4">⌄ <b>▱</b> com.office.scheduler</div>
+          <button type="button" class="tree-row file" style="--level:5" data-file="OfficeApplication.java"><b>J</b> OfficeApplication</button>
+          <button type="button" class="tree-row file" style="--level:5" data-file="ShiftService.java"><b>J</b> ShiftService</button>
+          <div class="tree-row folder" style="--level:3">⌄ <b>▱</b> resources</div>
+          <button type="button" class="tree-row file" style="--level:4" data-file="application.properties"><b>⚙</b> application.properties</button>
+          <button type="button" class="tree-row file" style="--level:1" data-file="pom.xml"><b class="maven">m</b> pom.xml</button>
+        </div>
+      </aside>
+      <section class="ide-editor" aria-label="代码编辑器">
+        <nav class="ide-tabs" id="ideTabs" aria-label="打开的文件"></nav>
+        <div class="ide-breadcrumb" id="ideBreadcrumb"></div>
+        <div class="code-area">
+          <div class="code-gutter" aria-hidden="true"><pre id="lineNumbers"></pre></div>
+          <div class="code-surface">
+            <div class="code-highlight" id="codeHighlight" aria-hidden="true"><pre id="codePreview"></pre></div>
+            <textarea id="javaEditor" aria-label="Java 工程文件" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+          </div>
+        </div>
+      </section>
+      <section class="ide-terminal" aria-labelledby="terminalTitle">
+        <header><h2 id="terminalTitle">Terminal</h2><span class="terminal-tab">Local</span><span class="terminal-live" id="terminalLive"></span></header>
+        <div class="terminal-output" id="terminalOutput" role="log" aria-live="off" aria-label="文件检查输出" tabindex="0"></div>
+        <form class="terminal-command" id="terminalCommand">
+          <span aria-hidden="true">❯</span><input id="terminalInput" aria-label="终端命令" placeholder="check / clear" autocomplete="off" spellcheck="false">
+        </form>
+      </section>
+    </div>
+    <footer class="ide-footer"><span id="ideFileStatus"></span><span id="ideCursor">1:1</span><span>LF</span><span>UTF-8</span><span>4 spaces</span></footer>
+  </section>
+</body>
+</html>
