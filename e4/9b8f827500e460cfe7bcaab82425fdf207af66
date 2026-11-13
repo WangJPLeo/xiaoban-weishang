@@ -1,0 +1,30 @@
+index.html
+  s_c321ee639961f9::t_cb3e1a99964c29 45
+rift.js
+  s_c321ee639961f9::t_cb3e1a99964c29 10-11,14,16-18,35,49-50,55,58,107-108,122,127,130,244-246,255-256,259,318-319,331,360-363,398,413,432-436,440-448,450-460,462,464-467,470-471,473-477,480-485,487,489-494
+  s_c321ee639961f9::t_e85743c05ea0b0 495,507
+style.css
+  s_c321ee639961f9::t_cb3e1a99964c29 101
+arena.js
+  s_c321ee639961f9::t_d41700a6e108df 168-171,190,248,290-316,365-366,372,374,424-437
+game.js
+  s_c321ee639961f9::t_f96421840b7ac8 16,124-127,130,230-233
+说明.txt
+  s_c321ee639961f9::t_7018b4151a6836 13,19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e49b8f827500e460cfe7bcaab82425fdf207af66",
+  "prompts": {},
+  "sessions": {
+    "s_c321ee639961f9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf0d-c7a3-7bc0-892d-262bb302ecc1",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wangjipeng01 <wangjipeng01@zhuanzhuan.com>"
+    }
+  }
+}
