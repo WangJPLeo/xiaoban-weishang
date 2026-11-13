@@ -126,3 +126,9 @@ h1{font-family:Georgia,"Songti SC","Noto Serif CJK SC",serif;letter-spacing:.115
 @media(max-width:650px){.shell{padding:10px 8px}.match-score{top:5px;font-size:10px}.match-score span{padding:2px 5px}.match-score b{font-size:11px}.minimap{right:4px;bottom:4px;width:95px}.unit-name{font-size:8px}.unit-health{width:39px;height:6px}.structure .unit-health{width:32px}.structure .unit-name{display:none}}
 
 #playerName{overflow:hidden;text-overflow:ellipsis;font-family:inherit;font-size:12px;font-weight:650}
+
+.actions{grid-template-columns:repeat(4,minmax(0,1fr))}
+.action[data-action="ultimate"]{grid-template-columns:auto 1fr auto}
+.skill-cooldown{color:#e5cba4;font:700 12px ui-monospace,monospace}
+.unit-label.shielded .unit-health{outline:1px solid #e5ca8d;box-shadow:0 0 7px #e5ca8d}
+@media(max-width:560px){.actions{grid-template-columns:repeat(2,minmax(0,1fr))}}

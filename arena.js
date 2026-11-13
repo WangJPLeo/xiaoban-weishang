@@ -43,14 +43,32 @@ function parseNickname(value){
   return name;
 }
 const ACTIONS = {
-  slap: { label:'扇巴掌', key:'KeyQ', hint:'Q', duration:480, strike:140, range:1.5, damage:8, arc:.20 },
+  punch: { label:'迅击', key:'KeyQ', hint:'Q', duration:560, strike:190, range:1.72, damage:13, arc:.48 },
   voice: { label:'语言攻击', key:'KeyW', hint:'W', duration:1360, strike:230, range:3.2, damage:7, arc:.37 },
-  kick: { label:'踢腿', key:'KeyE', hint:'E', duration:780, strike:330, range:2.12, damage:19, arc:.55 },
-  guard: { label:'防御', key:'KeyR', hint:'R', duration:1050 },
-  bow: { label:'跪拜', key:'KeyD', hint:'D', duration:1120 },
-  punch: { label:'出拳', key:'KeyK', hint:'K', duration:560, strike:190, range:1.72, damage:13, arc:.48 },
-  jump: { label:'跳跃', key:'Space', hint:'空格', duration:660 }
+  kick: { label:'腾空踢', key:'KeyE', hint:'E', duration:780, strike:330, range:2.36, damage:19, arc:.55 },
+  ultimate: { label:'职业大招', key:'KeyR', hint:'R', duration:1150, strike:460 }
 };
+const ULTIMATES={
+  '运营':{label:'全域投放',radius:4.4,damage:20,slow:1800,cooldown:32000},
+  '前台':{label:'来客止步',radius:3.7,damage:14,stun:1450,cooldown:33000},
+  'HR':{label:'绩效面谈',radius:4.8,damage:42,single:true,cooldown:30000},
+  '后端开发':{label:'线程风暴',radius:4.3,damage:33,cooldown:34000},
+  '前端开发':{label:'界面重绘',radius:3.5,damage:28,dash:2.8,cooldown:31000},
+  '测试':{label:'回归锁定',radius:5.1,damage:12,stun:1950,cooldown:37000},
+  '运维':{label:'紧急回滚',radius:5,heal:33,cooldown:36000},
+  'UI':{label:'视觉结界',radius:4.2,shield:34,cooldown:34000},
+  '销售':{label:'强势成交',radius:4.6,damage:27,pull:1.2,cooldown:33000},
+  '老板':{label:'拍板定案',radius:5.8,damage:28,stun:750,cooldown:41000},
+  '主管':{label:'全员集结',radius:5.6,heal:15,haste:3500,cooldown:35000},
+  '组长':{label:'破阵带队',radius:3.6,damage:22,shield:22,dash:1.8,cooldown:36000},
+  '行政':{label:'后勤补给',radius:5.2,heal:20,shield:15,cooldown:38000},
+  '实习生':{label:'超频冲刺',radius:2.9,damage:37,dash:3.7,cooldown:30000}
+};
+const ECLIPSE={label:'全场清空',global:true,cooldown:60000};
+function ultimateFor(hero){
+  if(hero?.name?.includes('柴') && hero.name.includes('杰')) return ECLIPSE;
+  return Object.hasOwn(ULTIMATES,hero?.role) ? ULTIMATES[hero.role] : ULTIMATES['运营'];
+}
 const obstacles=CLIFFS.map(([x,y,w,d])=>({x,y,w,d}));
 const STEP = .48;
 const COLS = Math.floor(FLOOR.w/STEP);
@@ -146,9 +164,9 @@ function findPath(start,target){
 }
 
 function heightAt(fighter,time){
-  if (fighter.action!=='jump') return 0;
-  const progress=Math.min(1,Math.max(0,(time-fighter.actionAt)/ACTIONS.jump.duration));
-  return Math.sin(progress*Math.PI)*1.45;
+  if (fighter.action!=='kick') return 0;
+  const progress=Math.min(1,Math.max(0,(time-fighter.actionAt)/ACTIONS.kick.duration));
+  return Math.sin(progress*Math.PI)*.62;
 }
 
 function createMatch(){
@@ -167,11 +185,11 @@ function createMatch(){
     const spawnPoint=positions.find(p=>[...players.values()].every(other=>other===fighter || !other.hp || distance(other,p)>.6)) || positions[0];
     Object.assign(fighter,{...spawnPoint,
       hp:100,maxHp:100,dx:side,dy:0,action:'idle',actionAt:time,vx:0,vy:0,path:[],target:null,
-      focus:null,moving:false,safeUntil:time+1500,struck:false,nextAuto:time,nextAI:time,nextChase:time});
+      focus:null,moving:false,shield:0,shieldUntil:0,slowUntil:0,stunUntil:0,hasteUntil:0,safeUntil:time+1500,struck:false,nextAuto:time,nextAI:time,nextChase:time});
   }
 
   function add(id,name,color,role,bot=false){
-    const fighter={id,name,color,role,team:color%2,bot,kind:'hero',score:0,voiceIndex:0,line:null,nextAI:0};
+    const fighter={id,name,color,role,team:color%2,bot,kind:'hero',score:0,voiceIndex:0,line:null,nextAI:0,ultimateReadyAt:0};
     spawn(fighter);
     players.set(id,fighter);
     return fighter;
@@ -247,7 +265,11 @@ function createMatch(){
         f.focus=target.id;
         f.nextChase=0;
       }
-    } else if (command.type==='action' && typeof command.action==='string' && Object.hasOwn(ACTIONS,command.action) && f.action==='idle'){
+    } else if (command.type==='action' && typeof command.action==='string' && Object.hasOwn(ACTIONS,command.action) && f.action==='idle' && !(f.stunUntil>time)){
+      if(command.action==='ultimate'){
+        if(f.ultimateReadyAt>time) return;
+        f.ultimateReadyAt=time+ultimateFor(f).cooldown;
+      }
       const target=enemyById(f,f.focus) || f.path[0];
       if (target) face(f,target);
       else if (f.vx || f.vy) face(f,{x:f.x+f.vx,y:f.y+f.vy});
@@ -262,7 +284,7 @@ function createMatch(){
 
   function move(f,dt){
     f.moving=false;
-    if (f.action!=='idle' && f.action!=='guard' && f.action!=='jump') return;
+    if (f.action!=='idle' || f.stunUntil>time) return;
     let target=f.path[0];
     while (target && distance(f,target)<.09){
       f.path.shift();
@@ -271,7 +293,7 @@ function createMatch(){
     if (f.vx || f.vy) target={x:f.x+f.vx,y:f.y+f.vy};
     if (!target){ f.target=null; return; }
     const remaining=face(f,target);
-    const step=Math.min(remaining,dt*(f.action==='guard' ? 2.1 : f.action==='jump' ? 5.65 : 4.85));
+    const step=Math.min(remaining,dt*(f.slowUntil>time ? 2.65 : f.hasteUntil>time ? 6.25 : 4.85));
     const x=f.x+f.dx*step,y=f.y+f.dy*step;
     if (canStand(x,y)){ f.x=x; f.y=y; f.moving=true; }
     else if (canStand(x,f.y) && x!==f.x){ f.x=x; f.moving=true; }
@@ -282,25 +304,75 @@ function createMatch(){
     return target.kind==='core' && structures.some(s=>s.team===target.team && s.kind==='tower' && s.hp>0);
   }
 
+  function defeat(source,target,credit=true){
+    target.hp=0;
+    if(target.kind==='core'){
+      winner=source.team;
+      restartAt=time+10000;
+    }else if(target.kind==='hero'){
+      if(credit && source.kind==='hero' && source.team!==target.team) source.score++;
+      Object.assign(target,{action:'ko',actionAt:time,spawnAt:time+5300,moving:false,path:[],target:null});
+    }else if(target.kind==='minion') units.delete(target.id);
+  }
+
   function damage(source,target,amount,kind){
-    if (!target.hp || target.safeUntil>time || winner!==null) return;
-    const shield=protectedCore(target);
-    const blocked=target.action==='guard' && (source.x-target.x)*target.dx+(source.y-target.y)*target.dy>=-.1;
-    const actual=shield ? 0 : Math.min(target.hp,blocked ? Math.ceil(amount*.22) : amount);
+    if(!target.hp || target.safeUntil>time || winner!==null) return;
+    const immune=protectedCore(target);
+    const absorbed=target.shieldUntil>time ? Math.min(amount,target.shield) : 0;
+    if(absorbed) target.shield-=absorbed;
+    const actual=immune ? 0 : Math.min(target.hp,amount-absorbed);
     target.hp-=actual;
-    events.push({ x:target.x,y:target.y,fromX:source.x,fromY:source.y,team:source.team,
-      kind:shield ? 'shield' : blocked ? 'guard' : !target.hp ? 'ko' : kind,damage:actual,t:time });
-    if (!target.hp){
-      if (target.kind==='core'){
-        winner=source.team;
-        restartAt=time+10000;
-      } else if (target.kind==='hero'){
-        if (source.kind==='hero') source.score++;
-        Object.assign(target,{action:'ko',actionAt:time,spawnAt:time+5300,moving:false,path:[],target:null});
-      } else if (target.kind==='minion') units.delete(target.id);
-    } else if (target.kind==='hero' && !blocked && kind!=='bolt'){
+    events.push({x:target.x,y:target.y,fromX:source.x,fromY:source.y,team:source.team,
+      kind:immune || !actual ? 'shield' : !target.hp ? 'ko' : kind,damage:actual,t:time});
+    if(!target.hp) defeat(source,target);
+    else if(target.kind==='hero' && actual && kind!=='bolt' && target.action!=='ultimate'){
       target.action='hurt';
       target.actionAt=time;
+    }
+  }
+
+  function displace(actor,dx,dy){
+    const length=Math.hypot(dx,dy);
+    const steps=Math.ceil(length/.2);
+    for(let i=0;i<steps;i++){
+      const x=actor.x+dx/steps,y=actor.y+dy/steps;
+      if(!canStand(x,y)) break;
+      actor.x=x;
+      actor.y=y;
+    }
+  }
+
+  function unleash(f){
+    const skill=ultimateFor(f);
+    events.push({x:f.x,y:f.y,team:f.team,kind:skill.global?'eclipse':'ultimate',label:skill.label,radius:skill.radius,t:time});
+    if(skill.global){
+      for(const hero of players.values()) if(hero.hp) defeat(f,hero,false);
+      return;
+    }
+    if(skill.dash) displace(f,f.dx*skill.dash,f.dy*skill.dash);
+    const allies=[...players.values()].filter(hero=>hero.hp && hero.team===f.team && distance(f,hero)<=skill.radius);
+    for(const ally of allies){
+      if(skill.heal) ally.hp=Math.min(ally.maxHp,ally.hp+skill.heal);
+      if(skill.shield){
+        ally.shield=Math.max(ally.shieldUntil>time?ally.shield:0,skill.shield);
+        ally.shieldUntil=time+4600;
+      }
+      if(skill.haste) ally.hasteUntil=time+skill.haste;
+    }
+    if(!skill.damage) return;
+    const enemies=[...players.values(),...units.values()].filter(hero=>hero.hp && hero.team!==f.team &&
+      !(hero.safeUntil>time) && distance(f,hero)<=skill.radius && clearWalk(f,hero));
+    enemies.sort((a,b)=>Number(b.kind==='hero')-Number(a.kind==='hero') || distance(f,a)-distance(f,b));
+    for(const enemy of skill.single?enemies.slice(0,1):enemies){
+      damage(f,enemy,skill.damage,'magic');
+      if(!enemy.hp || enemy.kind!=='hero') continue;
+      if(skill.stun) enemy.stunUntil=Math.max(enemy.stunUntil,time+skill.stun);
+      if(skill.slow) enemy.slowUntil=Math.max(enemy.slowUntil,time+skill.slow);
+      if(skill.pull){
+        const d=distance(f,enemy) || 1;
+        const ratio=Math.min(skill.pull,Math.max(0,d-.55))/d;
+        displace(enemy,(f.x-enemy.x)*ratio,(f.y-enemy.y)*ratio);
+      }
     }
   }
 
@@ -372,7 +444,7 @@ function createMatch(){
   }
 
   function controlBot(f){
-    if (!f.bot || time<f.nextAI || f.action!=='idle') return;
+    if (!f.bot || time<f.nextAI || f.action!=='idle' || f.stunUntil>time) return;
     f.nextAI=time+350+Math.random()*300;
     const targets=[...units.values(),...players.values()];
     const local=nearest(f,targets,5.2);
@@ -380,6 +452,15 @@ function createMatch(){
     const objective=structures.find(s=>s.team!==f.team && s.kind==='tower' && s.lane===lane && s.hp) ||
       structures.find(s=>s.team!==f.team && s.kind==='tower' && s.hp) ||
       structures.find(s=>s.team!==f.team && s.kind==='core');
+    const skill=ultimateFor(f);
+    const hasTarget=local && distance(f,local)<=skill.radius;
+    const needsSupport=(skill.heal || skill.shield || skill.haste) && [...players.values()].some(hero=>
+      hero.team===f.team && hero.hp>0 && hero.hp<=70 && distance(f,hero)<=skill.radius);
+    if(f.ultimateReadyAt<=time && ((skill.damage && hasTarget) || needsSupport)){
+      if(hasTarget) f.focus=local.id;
+      input(f.id,{type:'action',action:'ultimate'});
+      return;
+    }
     f.focus=(local || objective)?.id;
     f.nextChase=0;
   }
@@ -400,7 +481,7 @@ function createMatch(){
       f.vx=0;
       f.vy=0;
       face(f,target);
-      if (time>=f.nextAuto){ action(f,'punch'); f.nextAuto=time+720; }
+      if (time>=f.nextAuto && !(f.stunUntil>time)){ action(f,'punch'); f.nextAuto=time+720; }
     } else if (time>=(f.nextChase || 0)){
       setTarget(f,target);
       f.nextChase=time+380;
@@ -438,7 +519,8 @@ function createMatch(){
       const attack=ACTIONS[f.action];
       if (attack?.strike && !f.struck && time-f.actionAt>=attack.strike){
         f.struck=true;
-        strike(f,attack);
+        if(f.action==='ultimate') unleash(f);
+        else strike(f,attack);
       }
     }
     if (winner!==null) return;
@@ -458,7 +540,7 @@ function createMatch(){
       players:[...players.values()].map(p=>({
         id:p.id,name:p.name,color:p.color,role:p.role,team:p.team,bot:p.bot,kind:p.kind,x:p.x,y:p.y,dx:p.dx,dy:p.dy,
         hp:p.hp,maxHp:p.maxHp,score:p.score,action:p.action,actionAt:p.actionAt,moving:p.moving,target:p.target,
-        safeUntil:p.safeUntil,spawnAt:p.spawnAt,line:p.action==='voice' ? p.line : null
+        safeUntil:p.safeUntil,spawnAt:p.spawnAt,ultimateReadyAt:p.ultimateReadyAt,shield:p.shieldUntil>time?p.shield:0,line:p.action==='voice' ? p.line : null
       })) };
   }
 
@@ -468,7 +550,7 @@ function createMatch(){
   }};
 }
 
-const api={ FLOOR,BASES,LANES,CLIFFS,TOWERS,CORES,CAPACITY,ACTIONS,ROLES,NICKNAME_LIMIT,VOICE_LINES,parseNickname,canStand,heightAt,createMatch };
+const api={ FLOOR,BASES,LANES,CLIFFS,TOWERS,CORES,CAPACITY,ACTIONS,ROLES,NICKNAME_LIMIT,VOICE_LINES,parseNickname,ultimateFor,canStand,heightAt,createMatch };
 if (typeof module!=='undefined' && module.exports) module.exports=api;
 else root.Arena=api;
 })(globalThis);

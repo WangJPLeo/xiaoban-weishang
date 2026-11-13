@@ -330,6 +330,21 @@ function create(canvas){
     return obj;
   });
 
+  const bursts=Array.from({length:8},()=>{
+    const burst=mesh(ringGeo,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,depthWrite:false,side:THREE.DoubleSide}),
+      world,0,.075,0,1,1,1,false);
+    burst.visible=false;
+    return burst;
+  });
+  const eclipse=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({
+    color:0x8a4dcc,transparent:true,depthTest:false,depthWrite:false
+  }));
+  eclipse.frustumCulled=false;
+  eclipse.renderOrder=50;
+  eclipse.visible=false;
+  camera.add(eclipse);
+  world.add(camera);
+
   function fit(){
     if(canvas.clientWidth===width && canvas.clientHeight===height) return;
     width=canvas.clientWidth;
@@ -406,11 +421,6 @@ function create(canvas){
     const attack=move?.strike ? (elapsed<=move.strike?smooth(elapsed/move.strike):
       1-smooth((elapsed-move.strike)/(move.duration-move.strike))) : 0;
     switch(f.action){
-      case 'slap':
-        blend(chest,.09,-.7,.22,attack);
-        blend(arms[1],-1.36,-.62,-.68,attack);
-        blend(forearms[1],-.36,-.38,.14,attack);
-        break;
       case 'punch':
         blend(chest,.24,.52,-.12,attack);
         blend(arms[1],-1.37,-.26,-.11,attack);
@@ -421,6 +431,8 @@ function create(canvas){
         blend(chest,-.35,-.22,.15,attack);
         blend(legs[1],-1.49,.24,.18,attack);
         blend(shins[1],.27,0,0,attack);
+        blend(legs[0],-.65,0,0,poseWeight);
+        blend(shins[0],1.18,0,0,poseWeight);
         blend(arms[0],-.82,0,.59,attack);
         break;
       case 'voice':
@@ -428,26 +440,11 @@ function create(canvas){
         blend(arms[0],-1.12,0,.49,attack);
         blend(forearms[0],-1.1,0,0,attack);
         break;
-      case 'guard':
-        blend(arms[0],-.77,.55,.22,poseWeight);
-        blend(arms[1],-.86,-.38,-.22,poseWeight);
-        for(const elbow of forearms) blend(elbow,-1.3,0,0,poseWeight);
-        break;
-      case 'jump':
+      case 'ultimate':
+        blend(chest,-.21,.20,0,poseWeight);
         for(let i=0;i<2;i++){
-          blend(arms[i],-.95,0,i===0?.45:-.45,poseWeight);
-          blend(legs[i],i===0?-.95:-.49,0,0,poseWeight);
-          blend(shins[i],i===0?1.44:1.13,0,0,poseWeight);
-        }
-        pelvis.position.y-=.11*poseWeight;
-        break;
-      case 'bow':
-        pelvis.position.y-=.38*poseWeight;
-        blend(chest,.93,0,0,poseWeight);
-        for(let i=0;i<2;i++){
-          blend(legs[i],-1.17,0,0,poseWeight);
-          blend(shins[i],2.15,0,0,poseWeight);
-          blend(arms[i],-.68,0,0,poseWeight);
+          blend(arms[i],-1.64,0,i===0?.74:-.74,poseWeight);
+          blend(forearms[i],-.71,0,0,poseWeight);
         }
         break;
       case 'hurt':
@@ -462,8 +459,8 @@ function create(canvas){
         break;
       }
     }
-    ward.visible=f.action==='guard';
-    ward.material.opacity=.17*poseWeight;
+    ward.visible=f.shield>0;
+    ward.material.opacity=ward.visible?.14+.035*Math.sin(time/110):0;
     const fabric=cape.geometry.attributes.position,rest=capeGeo.attributes.position;
     for(let i=0;i<fabric.count;i++){
       const x=rest.getX(i),y=rest.getY(i)-.36, edge=clamp(-y/.74,0,1);
@@ -513,8 +510,29 @@ function create(canvas){
       targetRing.position.set(hero.target.x,.058,hero.target.y);
       targetRing.scale.setScalar(.76+Math.sin(time/110)*.18);
     }
+    bursts.forEach(burst=>{burst.visible=false;});
+    const ultimates=state.events.filter(e=>e.kind==='ultimate' || e.kind==='eclipse').slice(-bursts.length);
+    eclipse.visible=false;
+    eclipse.material.opacity=0;
+    for(const [i,event] of ultimates.entries()){
+      const elapsed=time-event.t;
+      if(elapsed<0 || elapsed>680) continue;
+      const progress=elapsed/680;
+      if(event.kind==='eclipse'){
+        eclipse.visible=true;
+        eclipse.position.set(0,0,-1);
+        eclipse.scale.set((camera.right-camera.left)/2,(camera.top-camera.bottom)/2,1);
+        eclipse.material.opacity=Math.max(eclipse.material.opacity,.54*(1-progress));
+      }
+      const burst=bursts[i];
+      burst.visible=true;
+      burst.position.set(event.x,.075,event.y);
+      burst.scale.setScalar((.28+.72*Math.sqrt(progress))*(event.radius || 25)/.53);
+      burst.material.opacity=(1-progress)*.84;
+      burst.material.color.setHex(event.kind==='eclipse'?0xcf8cff:palette[event.team]);
+    }
     effects.forEach(obj=>{obj.visible=false;});
-    state.events.slice(-effects.length).forEach((event,i)=>{
+    state.events.filter(e=>e.kind!=='ultimate' && e.kind!=='eclipse').slice(-effects.length).forEach((event,i)=>{
       const age=time-event.t;
       if(age<0 || age>540) return;
       const obj=effects[i],bolt=event.kind==='bolt';

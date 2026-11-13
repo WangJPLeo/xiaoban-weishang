@@ -18,6 +18,7 @@ const snapshots=[];
 let session=null, source=null, retry=0;
 let activePage=true, connecting=false;
 let leaderSignature='';
+const ultimateNotes=new Map();
 const pressed=new Set();
 const directionKeys=new Map([
   ['ArrowUp',[0,-1]],['ArrowDown',[0,1]],['ArrowLeft',[-1,0]],['ArrowRight',[1,0]]
@@ -31,6 +32,20 @@ function setText(id,text){
 
 function fighterSelf(){ return current?.players.find(p=>p.id===self); }
 
+function ultimateDescription(skill){
+  if(skill.global) return '全场英雄同时倒下，包含施法者。冷却 60 秒。';
+  const effects=[];
+  if(skill.dash) effects.push('向前突进');
+  if(skill.damage) effects.push((skill.single?'对最近的敌人':'对附近敌人')+'造成 '+skill.damage+' 伤害');
+  if(skill.stun) effects.push('眩晕 '+skill.stun/1000+' 秒');
+  if(skill.slow) effects.push('减速 '+skill.slow/1000+' 秒');
+  if(skill.pull) effects.push('拉近敌人');
+  if(skill.heal) effects.push('为附近队友恢复 '+skill.heal+' 生命');
+  if(skill.shield) effects.push('为附近队友提供 '+skill.shield+' 护盾');
+  if(skill.haste) effects.push('加速 '+skill.haste/1000+' 秒');
+  return effects.join('，')+'。冷却 '+skill.cooldown/1000+' 秒。';
+}
+
 function updateHud(){
   const player=fighterSelf();
   const position=current?.position || 0;
@@ -43,8 +58,20 @@ function updateHud(){
   const humans=current?.players.filter(hero=>!hero.bot).length || 0;
   setText('occupancy',current ? humans+' 真人 · '+(current.players.length-humans)+' 电脑' : '—');
   for (const [name,button] of buttons){
-    button.disabled=!player?.hp || !connected || current?.winner!=null;
+    const cooling=name==='ultimate' && player ? Math.max(0,Math.ceil((player.ultimateReadyAt-current.time)/1000)) : 0;
+    button.disabled=!player?.hp || !connected || current?.winner!=null || cooling>0;
     button.classList.toggle('active',player?.action===name);
+    if(name==='ultimate'){
+      const skill=player ? Arena.ultimateFor(player) : null;
+      const label=button.querySelector('.skill-label');
+      const countdown=button.querySelector('.skill-cooldown');
+      const text=skill?.label || ACTIONS.ultimate.label;
+      if(label.textContent!==text) label.textContent=text;
+      countdown.hidden=!cooling;
+      if(cooling) countdown.textContent=cooling+'s';
+      if(skill && !ultimateNotes.has(skill)) ultimateNotes.set(skill,ultimateDescription(skill));
+      button.title=ultimateNotes.get(skill) || '';
+    }
   }
   const structures=current?.structures || Arena.TOWERS;
   setText('blueTowers',structures.filter(s=>s.team===0 && s.kind==='tower' && s.hp>0).length+' / 3');
@@ -85,6 +112,7 @@ function drawLabels(state){
     const {badge,segments,speech}=labels.get(fighter.id);
     badge.classList.toggle('self',fighter.id===self);
     badge.hidden=fighter.hp<=0;
+    badge.classList.toggle('shielded',fighter.shield>0);
     if(badge.hidden){
       speech.hidden=true;
       continue;
@@ -211,8 +239,15 @@ function buildControls(){
     icon.className='skill-key';
     icon.textContent=action.hint;
     const label=document.createElement('span');
+    label.className='skill-label';
     label.textContent=action.label;
     button.append(icon,label);
+    if(name==='ultimate'){
+      const countdown=document.createElement('span');
+      countdown.className='skill-cooldown';
+      countdown.hidden=true;
+      button.append(countdown);
+    }
     button.addEventListener('click',event=>{
       if(event.detail) button.blur();
       send({type:'action',action:name});
@@ -391,7 +426,6 @@ window.addEventListener('keydown',event=>{
   }
   if (ideaOpen || !selectedRole || typing) return;
   const action=actionKeys.get(event.code);
-  if (event.code==='Space' && event.target instanceof HTMLButtonElement) return;
   if (!action && !directionKeys.has(event.code)) return;
   event.preventDefault();
   if (event.repeat) return;
