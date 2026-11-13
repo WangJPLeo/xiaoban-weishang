@@ -1,0 +1,23 @@
+arena.js
+  s_c321ee639961f9::t_7dd30b339aa82b 270,381,511-516,537-538,570-572,577-580
+rift.js
+  s_c321ee639961f9::t_0c6beb66c7ec06 366,385-396,520-614,618,677,701
+说明.txt
+  s_c321ee639961f9::t_db468ba72db03a 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a51ca5700e88a6151356d4beac2ff8eefa3eb643",
+  "prompts": {},
+  "sessions": {
+    "s_c321ee639961f9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf0d-c7a3-7bc0-892d-262bb302ecc1",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wangjipeng01 <wangjipeng01@zhuanzhuan.com>"
+    }
+  }
+}
