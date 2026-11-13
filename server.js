@@ -6,7 +6,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { randomUUID } = require('node:crypto');
 const { WebSocketServer,WebSocket } = require('ws');
-const { createMatch,CAPACITY,ROLES } = require('./arena');
+const { createMatch,CAPACITY,ROLES,NICKNAME_LIMIT,parseNickname } = require('./arena');
 
 const port=Number(process.env.PORT || 8899);
 const host=process.env.HOST || '0.0.0.0';
@@ -15,7 +15,7 @@ const reconnectMs=3500;
 const match=createMatch();
 const members=new Map();
 const queue=[];
-let nextName=1;
+let nextId=1;
 const sockets=new WebSocketServer({noServer:true,maxPayload:4096});
 
 const assets = new Map([
@@ -23,6 +23,8 @@ const assets = new Map([
   ['/index.html', ['index.html','text/html']],
   ['/arena.js', ['arena.js','text/javascript']],
   ['/game.js', ['game.js','text/javascript']],
+  ['/rift.js', ['rift.js','text/javascript']],
+  ['/vendor/three.min.js', ['vendor/three.min.js','text/javascript']],
   ['/idea.js', ['idea.js','text/javascript']],
   ['/idea.css', ['idea.css','text/css']],
   ['/style.css', ['style.css','text/css']]
@@ -143,9 +145,13 @@ async function handle(req,res){
         sendJSON(res,400,{ error:'select a profession' });
         return;
       }
-      const number=nextName++;
+      const nickname=parseNickname(body.nickname);
+      if (!nickname){
+        sendJSON(res,400,{error:'昵称须为 1–'+NICKNAME_LIMIT+' 个字符'});
+        return;
+      }
       member={
-        token:randomUUID(),id:String(number),role:body.role,name:body.role+' '+String(number).padStart(2,'0'),
+        token:randomUUID(),id:String(nextId++),role:body.role,name:nickname+' · '+body.role,
         socket:null,expires:Date.now()+10000,target:null
       };
       members.set(member.token,member);

@@ -1,15 +1,47 @@
 (function(root){
 'use strict';
 
-const FLOOR = { w:22, h:14.7 };
-const ROOMS = [
-  { activity:'meeting', name:'会议室', x:0, width:7.4, floor:'#778e80' },
-  { activity:'toilet', name:'卫生间', x:7.4, width:6.7, floor:'#889ca6' },
-  { activity:'sofa', name:'休息区', x:14.1, width:7.9, floor:'#ae9272' }
+const FLOOR={w:46,h:29};
+const BASES=[{x:3.55,y:14.5},{x:42.45,y:14.5}];
+const LANES=[
+  [[3.55,14.5],[6,10],[9,4.7],[15,3.8],[23,3.8],[31,3.8],[37,4.7],[40,10],[42.45,14.5]],
+  [[3.55,14.5],[9,14.5],[17,14.5],[23,14.5],[29,14.5],[37,14.5],[42.45,14.5]],
+  [[3.55,14.5],[6,19],[9,24.3],[15,25.2],[23,25.2],[31,25.2],[37,24.3],[40,19],[42.45,14.5]]
+].map(lane=>lane.map(([x,y])=>({x,y})));
+const CLIFFS=[
+  [10.5,8.3,5.2,3.1],[17,7,2.7,3.7],[25.7,7.7,3.5,3.3],[31,8.2,4.7,3.1],
+  [10.5,18,5.2,3],[17,18.8,2.7,3.7],[25.7,18,3.5,3.3],[31,18,4.7,3.1]
 ];
+const TOWERS=LANES.flatMap((_,lane)=>[0,1].map(team=>({
+  id:'tower-'+lane+'-'+team,team,lane,kind:'tower',x:team===0 ? 14 : 32,
+  y:[4.25,14.5,24.75][lane],hp:140,maxHp:140
+})));
+const CORES=BASES.map((base,team)=>({...base,id:'core-'+team,team,kind:'core',hp:220,maxHp:220}));
+const createStructures=()=>[...TOWERS,...CORES].map(s=>({...s,nextAttack:0}));
+const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
 const CAPACITY = 10;
 const ROLES = ['运营','前台','HR','后端开发','前端开发','测试','运维','UI','销售','老板','主管','组长','行政','实习生'];
-const VOICE_LINES = ['你的底层逻辑有问题','大煞笔','雷霆打菜','起飞'];
+const NICKNAME_LIMIT = 16;
+const VOICE_LINES = [
+  '你的底层逻辑有问题','大煞笔','雷霆打菜','起飞',
+  '菜成这样还敢来开会？','你这操作，狗看了都摇头',
+  '别甩锅了，锅都嫌你菜','你他妈是来给对面冲业绩的吧？',
+  '你打的是擂台还是退休申请？','你这走位，闭眼打都能中',
+  '这水平还敢带队？散会！','你这拳是走审批了吗？',
+  '你这操作，回收站都拒收','别复盘了，直接删录像',
+  '你这战绩，PPT都救不回来','你这输出，绩效都不好意思给分',
+  '你这方案唯一的亮点是撤回键','你打半天，伤害全在自己人身上',
+  '你这破走位，打印机卡纸都比你流畅','我防你干嘛？你自己都打不中'
+];
+
+function parseNickname(value){
+  if (typeof value!=='string') return null;
+  const name=value.trim();
+  if ([...name].length>NICKNAME_LIMIT || !/[\p{L}\p{N}\p{P}\p{S}]/u.test(name) ||
+      /[\p{Cc}\p{Bidi_Control}\p{Zl}\p{Zp}]/u.test(name)) return null;
+  return name;
+}
 const ACTIONS = {
   slap: { label:'扇巴掌', key:'KeyQ', hint:'Q', duration:480, strike:140, range:1.5, damage:8, arc:.20 },
   voice: { label:'语言攻击', key:'KeyW', hint:'W', duration:1360, strike:230, range:3.2, damage:7, arc:.37 },
@@ -19,118 +51,7 @@ const ACTIONS = {
   punch: { label:'出拳', key:'KeyK', hint:'K', duration:560, strike:190, range:1.72, damage:13, arc:.48 },
   jump: { label:'跳跃', key:'Space', hint:'空格', duration:660 }
 };
-const DESKS = [
-  { x:3.15,y:5.37 }, { x:16.15,y:5.37 },
-  { x:3.15,y:10.16 }, { x:16.15,y:10.16 }
-];
-
-function layout(art={}){
-  const { box,table,chair,plant,quad,WALL,DARK,STEEL,WOOD } = art;
-  const obstacles = [];
-  function fixture(x,y,w,d,draw){
-    obstacles.push({x,y,w,d});
-    if (art.fixture) art.fixture(x,y,w,d,draw);
-  }
-  function partition(x,y,w,d,h){
-    fixture(x,y,w,d,()=>box(x,y,w,d,0,h,WALL));
-  }
-  [7.3,14].forEach(function(x){
-    partition(x,.18,.2,3.85,1.72);
-  });
-  ROOMS.forEach(function(room){
-    var x = room.x+.16, y = 4, gap = room.width/2;
-    partition(x,y,gap-.7,.17,.54);
-    partition(x+gap+.6,y,room.width-gap-.76,.17,.54);
-  });
-
-  fixture(1.8,1.3,3.55,1.14,function(){
-    table(1.8,1.3,3.55,1.14);
-    var paper = ['#dedccb','#b0bbae','#89988d'];
-    box(2.2,1.53,.55,.3,.92,.035,paper);
-    quad(2.28,1.59,.28,.035,.96,'#87948e');
-    quad(2.28,1.68,.36,.035,.96,'#9ba69b');
-    box(3.16,1.76,.5,.32,.92,.02,paper);
-    box(3.9,1.59,.62,.32,.92,.045,DARK);
-    box(4.67,1.76,.22,.18,.92,.16,STEEL);
-  });
-  [[2.25,.6],[3.9,.6],[.99,1.63],[2.36,2.61],[4.04,2.61]].forEach(function(p){
-    fixture(p[0],p[1],.64,.53,function(){ chair(p[0],p[1],p[1]>2); });
-  });
-  fixture(6.49,.42,.54,.55,function(){ plant(6.52,.48,1.13); });
-
-  fixture(7.75,.33,1.44,.84,function(){
-    box(7.75,.33,1.44,.84,0,.75,STEEL);
-    box(7.72,.32,1.5,.91,.74,.13,['#e2e8d6','#b4c7bc','#819d9a']);
-    box(8.04,.54,.72,.46,.86,.02,['#95aeaa','#738f8d','#536e72']);
-    box(8.36,.45,.11,.12,.86,.23,STEEL);
-  });
-  [9.65,11.65].forEach(function(x){
-    var ceramic = ['#eff0e7','#c9d3cc','#9baead'];
-    partition(x,.38,1.53,.12,1.53);
-    partition(x+1.43,.5,.12,1.49,1.52);
-    fixture(x+.28,.55,.75,.97,function(){
-      box(x+.39,.84,.51,.5,0,.39,STEEL);
-      box(x+.28,.54,.75,.34,.37,.46,ceramic);
-      box(x+.34,.61,.56,.16,.83,.035,ceramic);
-      quad(x+.83,.65,.12,.07,.87,'#718e94');
-      box(x+.27,.85,.74,.68,.35,.22,ceramic);
-      quad(x+.38,.96,.53,.47,.575,'#738b90');
-      quad(x+.47,1.02,.37,.29,.58,'#90b6b9');
-      quad(x+.32,1.44,.63,.047,.581,'#ffffff80');
-    });
-  });
-  fixture(13.04,2.54,.47,.46,function(){ box(13.04,2.54,.47,.46,0,.51,DARK); });
-
-  fixture(14.6,.43,2.65,.67,function(){
-    box(14.6,.43,2.65,.67,0,.78,WOOD);
-    box(15.26,.51,.65,.48,.78,.48,DARK);
-    box(15.39,.89,.35,.12,1,.09,STEEL);
-    box(16.22,.65,.24,.21,.78,.17,STEEL);
-    box(16.55,.62,.2,.21,.78,.13,STEEL);
-  });
-  fixture(18.25,.46,2.82,1.12,function(){
-    var frame = ['#86956e','#637553','#495e48'];
-    var cushion = ['#a4b086','#7d8d69','#617654'];
-    box(18.33,.65,2.63,.85,0,.18,DARK);
-    box(18.25,.46,2.82,1.12,.12,.32,frame);
-    box(18.25,.46,2.82,.26,.4,.66,frame);
-    box(18.50,.53,1.11,.16,.57,.40,cushion);
-    box(19.66,.53,1.15,.16,.57,.40,cushion);
-    box(18.51,.74,1.11,.74,.41,.10,cushion);
-    box(19.66,.74,1.15,.74,.41,.10,cushion);
-    box(18.25,.72,.25,.86,.43,.28,frame);
-    box(20.82,.72,.25,.86,.43,.28,frame);
-    box(18.56,.83,.43,.44,.51,.13,['#dac195','#a88762','#80654b']);
-    quad(18.61,.87,.33,.03,.65,'#eed6a2');
-  });
-  fixture(20.83,2.6,.62,.54,function(){ plant(20.94,2.65,1.15); });
-  fixture(16.88,1.9,1.36,.68,function(){
-    box(16.88,1.9,1.36,.68,0,.4,WOOD);
-    box(17.14,2.11,.5,.23,.4,.06,['#a7b9bb','#769495','#527077']);
-  });
-  fixture(.61,6.15,.75,.76,function(){
-    box(.61,6.15,.75,.76,0,.77,STEEL);
-    box(.61,6.15,.75,.76,.77,.27,DARK);
-    box(.74,6.3,.47,.35,1.04,.045,['#e6e4cc','#b9c9bd','#93a49b']);
-  });
-  fixture(.6,11.6,.68,.63,function(){ plant(.76,11.72,1.28); });
-  fixture(20.56,9.54,.62,.61,function(){ plant(20.65,9.65,1.28); });
-  fixture(20.61,5.27,.59,.65,function(){
-    box(20.61,5.27,.59,.65,0,.8,STEEL);
-    box(20.71,5.36,.38,.44,.8,.55,['#8fc5c5','#68a1aa','#4f7b87']);
-  });
-  DESKS.forEach(({x,y})=>{
-    fixture(x,y,2.84,1.07,()=>art.desk(x,y));
-    fixture(x+1.02,y+1.83,.64,.53,()=>chair(x+1.02,y+1.83,true));
-  });
-  return obstacles;
-}
-
-const obstacles = layout();
-const spawns = [
-  [7,6],[9.4,6],[12.1,6],[14.6,6],[7,9.4],
-  [14.6,9.4],[7,12.6],[9.4,12.6],[12.1,12.6],[14.6,12.6]
-];
+const obstacles=CLIFFS.map(([x,y,w,d])=>({x,y,w,d}));
 const STEP = .48;
 const COLS = Math.floor(FLOOR.w/STEP);
 const ROWS = Math.floor(FLOOR.h/STEP);
@@ -231,170 +152,295 @@ function heightAt(fighter,time){
 }
 
 function createMatch(){
-  const players = new Map();
-  let time=0;
-  let events=[];
+  const players=new Map();
+  const units=new Map();
+  let structures=createStructures();
+  let time=0, nextWave=1200, unitId=0, winner=null, restartAt=0, events=[];
 
   function spawn(fighter){
-    const candidates=[spawns[fighter.color],...spawns];
-    const safe=candidates.find(([x,y])=>[...players.values()].every(other=>
-      other===fighter || !other.hp || Math.hypot(x-other.x,y-other.y)>1.25)) || candidates[0];
-    [fighter.x,fighter.y]=safe;
-    Object.assign(fighter,{ hp:100,dx:1,dy:0,action:'idle',actionAt:time,
-      vx:0,vy:0,path:[],target:null,moving:false,safeUntil:time+1000,struck:false });
+    const side=fighter.team===0 ? 1 : -1;
+    const base=BASES[fighter.team];
+    const positions=Array.from({length:5},(_,i)=>{
+      const slot=(fighter.color+i)%5;
+      return {x:base.x+side*(1.64+slot%2*.7),y:base.y+(slot-2)*.89};
+    });
+    const spawnPoint=positions.find(p=>[...players.values()].every(other=>other===fighter || !other.hp || distance(other,p)>.6)) || positions[0];
+    Object.assign(fighter,{...spawnPoint,
+      hp:100,maxHp:100,dx:side,dy:0,action:'idle',actionAt:time,vx:0,vy:0,path:[],target:null,
+      focus:null,moving:false,safeUntil:time+1500,struck:false,nextAuto:time,nextAI:time,nextChase:time});
   }
 
-  function add(id,name,color,role){
-    const fighter={ id,name,color,role,score:0,voiceIndex:0,line:null };
+  function add(id,name,color,role,bot=false){
+    const count=[0,0];
+    for (const hero of players.values()) if (!hero.bot) count[hero.team]++;
+    const team=bot ? color%2 : count[0]<=count[1] ? 0 : 1;
+    const fighter={id,name,color,role,team,bot,kind:'hero',score:0,voiceIndex:0,line:null,nextAI:0};
     spawn(fighter);
     players.set(id,fighter);
     return fighter;
   }
 
-  function canMoveTo(fighter,x,y){
-    if (!canStand(x,y)) return false;
-    for (const other of players.values()){
-      if (other===fighter || !other.hp) continue;
-      const gap=(x-other.x)**2+(y-other.y)**2;
-      if (gap<.51**2 && gap<(fighter.x-other.x)**2+(fighter.y-other.y)**2) return false;
-    }
-    return true;
+  function setTarget(fighter,target){
+    fighter.vx=0;
+    fighter.vy=0;
+    fighter.path=findPath(fighter,target);
+    fighter.target=fighter.path.at(-1) || null;
   }
 
-  function move(fighter,dt){
-    fighter.moving=false;
-    if (!fighter.hp || ['slap','punch','kick','bow','voice','hurt'].includes(fighter.action)) return;
-    let x=fighter.vx, y=fighter.vy, distance=Infinity;
-    while (!x && !y && fighter.path.length){
-      const next=fighter.path[0];
-      distance=Math.hypot(next.x-fighter.x,next.y-fighter.y);
-      if (distance>.045){
-        x=(next.x-fighter.x)/distance;
-        y=(next.y-fighter.y)/distance;
-        break;
-      }
-      fighter.path.shift();
-    }
-    if (!x && !y){
-      fighter.target=null;
-      return;
-    }
-    const n=Math.hypot(x,y);
-    fighter.dx=x/n;
-    fighter.dy=y/n;
-    const speed=fighter.action==='guard' ? 1.85 : fighter.action==='jump' ? 4.55 : 4.05;
-    const step=Math.min(distance,dt*speed);
-    const tx=fighter.x+fighter.dx*step, ty=fighter.y+fighter.dy*step;
-    if (canMoveTo(fighter,tx,ty)){
-      fighter.x=tx;
-      fighter.y=ty;
-      fighter.moving=true;
-    } else if (tx!==fighter.x && canMoveTo(fighter,tx,fighter.y)){
-      fighter.x=tx;
-      fighter.moving=true;
-    } else if (ty!==fighter.y && canMoveTo(fighter,fighter.x,ty)){
-      fighter.y=ty;
-      fighter.moving=true;
-    }
+  function face(fighter,target){
+    const dx=target.x-fighter.x,dy=target.y-fighter.y,distance=Math.hypot(dx,dy);
+    if (distance>.001){ fighter.dx=dx/distance; fighter.dy=dy/distance; }
+    return distance;
+  }
+
+  function action(fighter,name){
+    fighter.action=name;
+    fighter.actionAt=time;
+    fighter.struck=false;
+    if (name==='voice') fighter.line=VOICE_LINES[fighter.voiceIndex++%VOICE_LINES.length];
   }
 
   function input(id,command){
-    const fighter=players.get(id);
-    if (!fighter?.hp || !command || typeof command!=='object') return;
+    const f=players.get(id);
+    if (winner!==null || !f?.hp || !command || typeof command!=='object') return;
     if (command.type==='move' && Number.isFinite(command.x) && Number.isFinite(command.y)){
-      fighter.vx=Math.min(1,Math.max(-1,command.x));
-      fighter.vy=Math.min(1,Math.max(-1,command.y));
-      fighter.path=[];
-      fighter.target=null;
+      f.vx=Math.max(-1,Math.min(1,command.x));
+      f.vy=Math.max(-1,Math.min(1,command.y));
+      f.path=[];
+      f.target=null;
+      f.focus=null;
     } else if (command.type==='target' && Number.isFinite(command.x) && Number.isFinite(command.y) &&
       command.x>=0 && command.x<=FLOOR.w && command.y>=0 && command.y<=FLOOR.h){
-      const target={x:command.x,y:command.y};
-      fighter.vx=0;
-      fighter.vy=0;
-      fighter.path=findPath(fighter,target);
-      fighter.target=fighter.path.at(-1) || null;
-    } else if (command.type==='action' && typeof command.action==='string' && Object.hasOwn(ACTIONS,command.action) && fighter.action==='idle'){
-      const next=fighter.path[0];
-      const x=fighter.vx || (next && next.x-fighter.x) || 0;
-      const y=fighter.vy || (next && next.y-fighter.y) || 0;
-      if (x || y){
-        const length=Math.hypot(x,y);
-        fighter.dx=x/length;
-        fighter.dy=y/length;
+      f.focus=null;
+      setTarget(f,{x:command.x,y:command.y});
+    } else if (command.type==='focus' && typeof command.id==='string'){
+      const target=enemyById(f,command.id);
+      if (target){
+        f.focus=target.id;
+        f.nextChase=0;
       }
-      fighter.action=command.action;
-      if (command.action==='voice') fighter.line=VOICE_LINES[fighter.voiceIndex++%VOICE_LINES.length];
-      fighter.actionAt=time;
-      fighter.struck=false;
+    } else if (command.type==='action' && typeof command.action==='string' && Object.hasOwn(ACTIONS,command.action) && f.action==='idle'){
+      const target=enemyById(f,f.focus) || f.path[0];
+      if (target) face(f,target);
+      else if (f.vx || f.vy) face(f,{x:f.x+f.vx,y:f.y+f.vy});
+      action(f,command.action);
     }
   }
 
-  function strike(fighter,move){
-    let target=null, closest=move.range;
-    for (const other of players.values()){
-      if (other===fighter || !other.hp || other.safeUntil>time || (move!==ACTIONS.voice && heightAt(other,time)>.48)) continue;
-      const dx=other.x-fighter.x, dy=other.y-fighter.y, distance=Math.hypot(dx,dy);
-      if (distance>closest || (distance>.25 && dx*fighter.dx+dy*fighter.dy<distance*move.arc)) continue;
-      if (!clearWalk(fighter,other)) continue;
-      target=other;
-      closest=distance;
+  function enemyById(f,id){
+    const target=players.get(id) || units.get(id) || structures.find(s=>s.id===id);
+    return target && target.team!==f.team && target.hp>0 ? target : null;
+  }
+
+  function move(f,dt){
+    f.moving=false;
+    if (f.action!=='idle' && f.action!=='guard' && f.action!=='jump') return;
+    let target=f.path[0];
+    while (target && distance(f,target)<.09){
+      f.path.shift();
+      target=f.path[0];
     }
-    if (!target) return;
-    const front=(fighter.x-target.x)*target.dx+(fighter.y-target.y)*target.dy>=-.1;
-    const blocked=target.action==='guard' && front;
-    const damage=blocked ? Math.ceil(move.damage*.22) : move.damage;
-    target.hp=Math.max(0,target.hp-damage);
-    const kind=!target.hp ? 'ko' : blocked ? 'guard' : 'hit';
-    events.push({ x:target.x,y:target.y,kind,damage,t:time });
+    if (f.vx || f.vy) target={x:f.x+f.vx,y:f.y+f.vy};
+    if (!target){ f.target=null; return; }
+    const remaining=face(f,target);
+    const step=Math.min(remaining,dt*(f.action==='guard' ? 2.1 : f.action==='jump' ? 5.65 : 4.85));
+    const x=f.x+f.dx*step,y=f.y+f.dy*step;
+    if (canStand(x,y)){ f.x=x; f.y=y; f.moving=true; }
+    else if (canStand(x,f.y) && x!==f.x){ f.x=x; f.moving=true; }
+    else if (canStand(f.x,y) && y!==f.y){ f.y=y; f.moving=true; }
+  }
+
+  function protectedCore(target){
+    return target.kind==='core' && structures.some(s=>s.team===target.team && s.kind==='tower' && s.hp>0);
+  }
+
+  function damage(source,target,amount,kind){
+    if (!target.hp || target.safeUntil>time || winner!==null) return;
+    const shield=protectedCore(target);
+    const blocked=target.action==='guard' && (source.x-target.x)*target.dx+(source.y-target.y)*target.dy>=-.1;
+    const actual=shield ? 0 : Math.min(target.hp,blocked ? Math.ceil(amount*.22) : amount);
+    target.hp-=actual;
+    events.push({ x:target.x,y:target.y,fromX:source.x,fromY:source.y,team:source.team,
+      kind:shield ? 'shield' : blocked ? 'guard' : !target.hp ? 'ko' : kind,damage:actual,t:time });
     if (!target.hp){
-      fighter.score++;
-      Object.assign(target,{ action:'ko',actionAt:time,spawnAt:time+2300,moving:false,path:[],target:null });
-    } else if (!blocked){
-      Object.assign(target,{ action:'hurt',actionAt:time,moving:false });
-      const x=target.x+fighter.dx*.25,y=target.y+fighter.dy*.25;
-      if (canStand(x,y)){
-        target.x=x;
-        target.y=y;
+      if (target.kind==='core'){
+        winner=source.team;
+        restartAt=time+10000;
+      } else if (target.kind==='hero'){
+        if (source.kind==='hero') source.score++;
+        Object.assign(target,{action:'ko',actionAt:time,spawnAt:time+5300,moving:false,path:[],target:null});
+      } else if (target.kind==='minion') units.delete(target.id);
+    } else if (target.kind==='hero' && !blocked && kind!=='bolt'){
+      target.action='hurt';
+      target.actionAt=time;
+    }
+  }
+
+  function strike(f,move){
+    let target=null, closest=Infinity;
+    const focused=enemyById(f,f.focus);
+    for (const other of focused ? [focused,...players.values(),...units.values(),...structures] : [...players.values(),...units.values(),...structures]){
+      if (other.team===f.team || !other.hp || other.safeUntil>time ||
+        (move!==ACTIONS.voice && heightAt(other,time)>.48)) continue;
+      const d=distance(f,other),reach=move.range+(other.kind==='core' ? .9 : other.kind==='tower' ? .48 : 0);
+      if (d>reach || d>=closest || (d>.25 && (other.x-f.x)*f.dx+(other.y-f.y)*f.dy<d*move.arc)) continue;
+      if (!clearWalk(f,other)) continue;
+      target=other;
+      closest=d;
+      if (other===focused) break;
+    }
+    if (target) damage(f,target,move.damage,f.action==='voice' ? 'magic' : 'hit');
+  }
+
+  function wave(){
+    for (let lane=0;lane<LANES.length;lane++){
+      for (const team of [0,1]){
+        const path=team===0 ? LANES[lane] : LANES[lane].slice().reverse();
+        for (let i=0;i<3;i++){
+          const id='minion-'+(++unitId);
+          const offset=(i-1)*.52;
+          const route=path.map(p=>({x:p.x,y:p.y+offset}));
+          units.set(id,{ id,team,lane,kind:'minion',ranged:i===2,x:route[0].x,y:route[0].y,
+            dx:team===0?1:-1,dy:0,route,step:1,hp:27,maxHp:27,nextAttack:time+i*120,moving:true });
+        }
       }
     }
+  }
+
+  function nearest(f,targets,range){
+    let best=null;
+    for (const target of targets){
+      if (target.team===f.team || !target.hp || target.safeUntil>time) continue;
+      const d=distance(f,target);
+      if (d<=range && clearWalk(f,target)){ range=d; best=target; }
+    }
+    return best;
+  }
+
+  function minions(dt){
+    const living=[...units.values()];
+    for (const unit of living){
+      if (!unit.hp) continue;
+      const reach=unit.ranged ? 2.6 : 1.12;
+      const enemies=[...living.filter(u=>u.lane===unit.lane),...players.values(),...structures.filter(s=>s.lane===unit.lane || s.kind==='core')];
+      const target=nearest(unit,enemies,reach) || nearest(unit,enemies,reach+1.35);
+      unit.moving=false;
+      if (target && face(unit,target)<=reach){
+        if (time>=unit.nextAttack){
+          damage(unit,target,unit.ranged ? 4 : 5,unit.ranged ? 'bolt' : 'hit');
+          unit.nextAttack=time+960;
+        }
+        continue;
+      }
+      const point=target || unit.route[unit.step];
+      if (!point) continue;
+      const remaining=face(unit,point);
+      if (!target && remaining<.16){ unit.step++; continue; }
+      const step=Math.min(dt*2.55,remaining);
+      const x=unit.x+unit.dx*step,y=unit.y+unit.dy*step;
+      if (canStand(x,y)){ unit.x=x; unit.y=y; unit.moving=true; }
+      else if (!target) unit.step++;
+    }
+  }
+
+  function controlBot(f){
+    if (!f.bot || time<f.nextAI || f.action!=='idle') return;
+    f.nextAI=time+350+Math.random()*300;
+    const targets=[...units.values(),...players.values()];
+    const local=nearest(f,targets,5.2);
+    const lane=f.color%3;
+    const objective=structures.find(s=>s.team!==f.team && s.kind==='tower' && s.lane===lane && s.hp) ||
+      structures.find(s=>s.team!==f.team && s.kind==='tower' && s.hp) ||
+      structures.find(s=>s.team!==f.team && s.kind==='core');
+    f.focus=(local || objective)?.id;
+    f.nextChase=0;
+  }
+
+  function chase(f){
+    if (!f.focus || f.action!=='idle') return;
+    const target=enemyById(f,f.focus);
+    if (!target){
+      f.focus=null;
+      f.path=[];
+      f.target=null;
+      return;
+    }
+    const reach=target.kind==='core' ? 2.3 : target.kind==='tower' ? 1.95 : 1.5;
+    if (distance(f,target)<=reach && clearWalk(f,target)){
+      f.path=[];
+      f.target=null;
+      f.vx=0;
+      f.vy=0;
+      face(f,target);
+      if (time>=f.nextAuto){ action(f,'punch'); f.nextAuto=time+720; }
+    } else if (time>=(f.nextChase || 0)){
+      setTarget(f,target);
+      f.nextChase=time+380;
+    }
+  }
+
+  function reset(){
+    structures=createStructures();
+    units.clear();
+    winner=null;
+    nextWave=time+1200;
+    for (const f of players.values()){ f.score=0; spawn(f); }
   }
 
   function tick(ms){
     time+=ms;
-    events=events.filter(event=>time-event.t<620);
-    for (const fighter of players.values()){
-      if (!fighter.hp){
-        if (time>=fighter.spawnAt) spawn(fighter);
-        continue;
-      }
-      const moveDef=ACTIONS[fighter.action];
-      const elapsed=time-fighter.actionAt;
-      if ((moveDef && elapsed>=moveDef.duration) || (fighter.action==='hurt' && elapsed>=210)){
-        fighter.action='idle';
-        fighter.actionAt=time;
-      }
-      move(fighter,ms/1000);
+    events=events.filter(e=>time-e.t<700);
+    if (!players.size) return;
+    if (winner!==null){
+      if (time>=restartAt) reset();
+      return;
     }
-    for (const fighter of players.values()){
-      const moveDef=ACTIONS[fighter.action];
-      if (!fighter.hp || !moveDef?.strike || fighter.struck || time-fighter.actionAt<moveDef.strike) continue;
-      fighter.struck=true;
-      strike(fighter,moveDef);
+    if (time>=nextWave){
+      if (units.size<=72) wave();
+      nextWave=time+13500;
+    }
+    for (const f of players.values()){
+      if (!f.hp){ if (time>=f.spawnAt) spawn(f); continue; }
+      const moveDef=ACTIONS[f.action], elapsed=time-f.actionAt;
+      if ((moveDef && elapsed>=moveDef.duration) || (f.action==='hurt' && elapsed>=210)) action(f,'idle');
+      if (distance(f,BASES[f.team])<3.15) f.hp=Math.min(f.maxHp,f.hp+ms*.015);
+      controlBot(f);
+      chase(f);
+      move(f,ms/1000);
+      const attack=ACTIONS[f.action];
+      if (attack?.strike && !f.struck && time-f.actionAt>=attack.strike){
+        f.struck=true;
+        strike(f,attack);
+      }
+    }
+    if (winner!==null) return;
+    minions(ms/1000);
+    for (const tower of structures){
+      if (tower.kind!=='tower' || !tower.hp || time<tower.nextAttack) continue;
+      const target=nearest(tower,units.values(),4.6) || nearest(tower,players.values(),4.6);
+      if (!target) continue;
+      damage(tower,target,13,'bolt');
+      tower.nextAttack=time+1070;
     }
   }
 
   function snapshot(){
-    return { time,events,players:[...players.values()].map(p=>({
-      id:p.id,name:p.name,color:p.color,role:p.role,x:p.x,y:p.y,dx:p.dx,dy:p.dy,hp:p.hp,score:p.score,
-      action:p.action,actionAt:p.actionAt,moving:p.moving,target:p.target,safeUntil:p.safeUntil,
-      line:p.action==='voice' ? p.line : null
-    })) };
+    return {time,events,winner,restartAt,units:[...units.values()].map(({route,step,nextAttack,...u})=>u),
+      structures:structures.map(({nextAttack,...s})=>s),
+      players:[...players.values()].map(p=>({
+        id:p.id,name:p.name,color:p.color,role:p.role,team:p.team,kind:p.kind,x:p.x,y:p.y,dx:p.dx,dy:p.dy,
+        hp:p.hp,maxHp:p.maxHp,score:p.score,action:p.action,actionAt:p.actionAt,moving:p.moving,target:p.target,
+        safeUntil:p.safeUntil,spawnAt:p.spawnAt,line:p.action==='voice' ? p.line : null
+      })) };
   }
 
-  return { players, add, input, tick, snapshot, remove:id=>players.delete(id) };
+  return {players,add,input,tick,snapshot,remove(id){
+    players.delete(id);
+    if (!players.size) reset();
+  }};
 }
 
-const api={ FLOOR,ROOMS,CAPACITY,ACTIONS,ROLES,VOICE_LINES,layout,canStand,heightAt,createMatch };
+const api={ FLOOR,BASES,LANES,CLIFFS,TOWERS,CORES,CAPACITY,ACTIONS,ROLES,NICKNAME_LIMIT,VOICE_LINES,parseNickname,canStand,heightAt,createMatch };
 if (typeof module!=='undefined' && module.exports) module.exports=api;
 else root.Arena=api;
 })(globalThis);

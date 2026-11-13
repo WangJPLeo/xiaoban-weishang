@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="idea.css">
   <script src="arena.js" defer></script>
   <script src="idea.js" defer></script>
+  <script src="vendor/three.min.js" defer></script>
+  <script src="rift.js" defer></script>
   <script src="game.js" defer></script>
 </head>
 <body>
@@ -21,32 +23,36 @@
       </div>
       <div class="top-tools">
         <button class="idea-toggle" id="showIdea" type="button"><span>切换到 IDEA</span><kbd>F</kbd></button>
-        <div class="connection" id="connection"><span class="status-dot"></span><span id="connectionText">等待选职业</span></div>
+        <div class="connection" id="connection"><span class="status-dot"></span><span id="connectionText">等待入场</span></div>
       </div>
     </header>
 
     <section class="metrics" aria-label="对局状态">
-      <div class="metric health">
-        <div><span id="playerName">我的体力</span><strong id="healthText">—</strong></div>
-        <progress id="healthBar" max="100" value="0" aria-label="我的体力"></progress>
-      </div>
+      <div class="metric"><span>我的英雄</span><strong id="playerName">—</strong></div>
       <div class="metric"><span>我的击倒</span><strong id="score">—</strong></div>
       <div class="metric"><span>场内人数</span><strong id="occupancy">— / 10</strong></div>
     </section>
 
     <section class="stage" aria-labelledby="floorTitle">
       <div class="stage-info">
-        <h2 id="floorTitle">办公室擂台</h2>
-        <p><kbd>↑ ↓ ← →</kbd> 移动，也可点击地面</p>
+        <h2 id="floorTitle">晶石峡谷</h2>
+        <p>点击地面移动 · 点击敌方目标攻击 · 滚轮缩放</p>
       </div>
       <div class="queue-notice" id="queueNotice" hidden role="status">
         <strong id="queuePosition"></strong><span>可以观战，有空位时自动进场</span>
       </div>
       <div class="scene">
-        <canvas id="gameCanvas" width="1152" height="592" aria-label="俯瞰像素格斗场"></canvas>
+        <canvas id="gameCanvas" width="1152" height="592" aria-label="三路峡谷 3D 战场"></canvas>
         <div id="sceneOverlay" class="scene-overlay" aria-hidden="true"></div>
+        <div class="match-score" aria-label="防御塔存活数">
+          <span class="blue">碧蓝 <b id="blueTowers">3 / 3</b></span>
+          <span class="red"><b id="redTowers">3 / 3</b> 赤焰</span>
+        </div>
+        <div class="match-result" id="matchResult" role="status" hidden><strong id="resultTitle"></strong><span id="resultDetail"></span></div>
+        <p class="graphics-error" id="graphicsError" hidden>这个浏览器无法开启 WebGL。请启用硬件加速后重新加载。</p>
+        <div class="minimap"><canvas id="minimap" width="252" height="158" aria-label="峡谷小地图"></canvas></div>
       </div>
-      <div class="actions" id="actions" aria-label="格斗动作"></div>
+      <div class="actions" id="actions" aria-label="英雄技能"></div>
     </section>
     <section class="standing" aria-labelledby="standingTitle">
       <h2 id="standingTitle">击倒榜</h2>
@@ -56,14 +62,19 @@
   </main>
   <dialog id="roleDialog" class="role-dialog" aria-labelledby="roleTitle">
     <form id="roleForm">
-      <h2 id="roleTitle">选择职业</h2>
+      <h2 id="roleTitle">入场登记</h2>
+      <div class="nickname-field">
+        <label for="nickname">昵称</label>
+        <input id="nickname" name="nickname" type="text" autocomplete="nickname" placeholder="输入 1–16 个字符" aria-describedby="nicknameError" required autofocus>
+        <span id="nicknameError" class="nickname-error" aria-live="polite" hidden>请输入 1–16 个可见字符。</span>
+      </div>
       <fieldset>
-        <legend class="visually-hidden">职业</legend>
+        <legend>职业</legend>
         <div class="role-grid" id="roleChoices"></div>
       </fieldset>
       <div class="role-footer">
         <button class="role-idea" type="button" id="roleIdea">打开 IDEA <kbd>F</kbd></button>
-        <button class="enter-fight" id="enterFight" type="submit" disabled>进入擂台</button>
+        <button class="enter-fight" id="enterFight" type="submit" disabled>进入峡谷</button>
       </div>
     </form>
   </dialog>
