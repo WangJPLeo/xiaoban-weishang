@@ -13,7 +13,7 @@ const buttons=new Map();
 const practice=document.documentElement.dataset.mode!=='online';
 let selectedRole=null, nickname=null, ideaOpen=false;
 let self=practice?'local':null;
-let current=null, connected=false, clockOffset=0, frameTime=null, lastFrame=0;
+let current=null, connected=false, clockOffset=0, frameTime=null, lastFrame=0, lastMinimap=0;
 const snapshots=[];
 let session=null, source=null, retry=0;
 let activePage=true, connecting=false;
@@ -121,10 +121,13 @@ function drawLabels(state){
     const z=hero ? 2.24+Arena.heightAt(fighter,state.time)*1.21 : fighter.kind==='core'?5.35:2.95;
     place(badge,fighter.x,fighter.y,z);
     const ratio=fighter.hp/fighter.maxHp*5;
-    segments.forEach((segment,index)=>segment.style.width=(Math.max(0,Math.min(1,ratio-index))*100)+'%');
+    segments.forEach((segment,index)=>{
+      const width=(Math.max(0,Math.min(1,ratio-index))*100)+'%';
+      if(segment.style.width!==width) segment.style.width=width;
+    });
     speech.hidden=!fighter.line;
     if(fighter.line){
-      speech.textContent=fighter.line;
+        if(speech.textContent!==fighter.line) speech.textContent=fighter.line;
       place(speech,fighter.x,fighter.y,z+.96);
     }
   }
@@ -224,7 +227,10 @@ function accept(state){
   current=state;
   connected=true;
   refreshLabels([...state.players,...state.structures]);
-  view?.drawMap(state,self);
+  if(state.time-lastMinimap>=120 || state.time<lastMinimap){
+    view?.drawMap(state,self);
+    lastMinimap=state.time;
+  }
   updateHud();
 }
 

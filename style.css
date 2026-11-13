@@ -98,7 +98,7 @@ h1{font-family:Georgia,"Songti SC","Noto Serif CJK SC",serif;letter-spacing:.115
 .stage-info{background:#172432;border-color:#615745}
 .stage-info h2{color:#f2dcae}
 .scene{background:#122823;isolation:isolate}
-#gameCanvas{width:100%;height:auto;aspect-ratio:2.02;image-rendering:auto}
+#gameCanvas{width:100%;height:auto;aspect-ratio:2.02;image-rendering:pixelated}
 .match-score{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;border:1px solid #ac926a;border-radius:4px;background:#111a25e8;box-shadow:0 4px 18px #0713188c;white-space:nowrap;font-size:12px}
 .match-score span{padding:5px 13px}
 .match-score b{margin:0 5px;color:#f2e4ca;font:700 13px ui-monospace,monospace}

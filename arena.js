@@ -165,8 +165,10 @@ function findPath(start,target){
 
 function heightAt(fighter,time){
   if (fighter.action!=='kick') return 0;
-  const progress=Math.min(1,Math.max(0,(time-fighter.actionAt)/ACTIONS.kick.duration));
-  return Math.sin(progress*Math.PI)*.62;
+  const airTime=(time-fighter.actionAt-145)/1000;
+  const flight=.475;
+  if(airTime<=0 || airTime>=flight) return 0;
+  return 2.15*airTime*(flight-airTime)/flight;
 }
 
 function createMatch(){
@@ -185,7 +187,7 @@ function createMatch(){
     const spawnPoint=positions.find(p=>[...players.values()].every(other=>other===fighter || !other.hp || distance(other,p)>.6)) || positions[0];
     Object.assign(fighter,{...spawnPoint,
       hp:100,maxHp:100,dx:side,dy:0,action:'idle',actionAt:time,vx:0,vy:0,path:[],target:null,
-      focus:null,moving:false,shield:0,shieldUntil:0,slowUntil:0,stunUntil:0,hasteUntil:0,safeUntil:time+1500,struck:false,nextAuto:time,nextAI:time,nextChase:time});
+      focus:null,moving:false,shield:0,shieldUntil:0,impulseX:0,impulseY:0,slowUntil:0,stunUntil:0,hasteUntil:0,safeUntil:time+1500,struck:false,nextAuto:time,nextAI:time,nextChase:time});
   }
 
   function add(id,name,color,role,bot=false){
@@ -243,6 +245,7 @@ function createMatch(){
     fighter.action=name;
     fighter.actionAt=time;
     fighter.struck=false;
+    fighter.actionTravel=0;
     if (name==='voice') fighter.line=VOICE_LINES[fighter.voiceIndex++%VOICE_LINES.length];
   }
 
@@ -284,7 +287,33 @@ function createMatch(){
 
   function move(f,dt){
     f.moving=false;
-    if (f.action!=='idle' || f.stunUntil>time) return;
+    if(f.impulseX || f.impulseY){
+      const distance=(1-Math.exp(-dt*10))/10;
+      const travel=displace(f,f.impulseX*distance,f.impulseY*distance);
+      const decay=travel>.0001?Math.exp(-dt*10):0;
+      f.impulseX*=decay;
+      f.impulseY*=decay;
+      if(Math.hypot(f.impulseX,f.impulseY)<.09) f.impulseX=f.impulseY=0;
+      return;
+    }
+    if(f.stunUntil>time) return;
+    if(f.action==='kick' || f.action==='punch'){
+      const from=f.action==='kick'?145:90;
+      const duration=f.action==='kick'?475:180;
+      const fraction=Math.max(0,Math.min(1,(time-f.actionAt-from)/duration));
+      const traveled=(f.action==='kick'?1.06:.43)*(1-(1-fraction)**2);
+      let advance=traveled-(f.actionTravel || 0);
+      for(const other of players.values()){
+        if(other===f || !other.hp) continue;
+        const dx=other.x-f.x,dy=other.y-f.y;
+        const front=dx*f.dx+dy*f.dy;
+        if(front>=0 && Math.abs(dx*f.dy-dy*f.dx)<.49) advance=Math.min(advance,front-.5);
+      }
+      if(advance>0) displace(f,f.dx*advance,f.dy*advance);
+      f.actionTravel=traveled;
+      return;
+    }
+    if(f.action!=='idle') return;
     let target=f.path[0];
     while (target && distance(f,target)<.09){
       f.path.shift();
@@ -333,13 +362,16 @@ function createMatch(){
 
   function displace(actor,dx,dy){
     const length=Math.hypot(dx,dy);
-    const steps=Math.ceil(length/.2);
+    const steps=Math.ceil(length/.14);
+    let traveled=0;
     for(let i=0;i<steps;i++){
       const x=actor.x+dx/steps,y=actor.y+dy/steps;
       if(!canStand(x,y)) break;
       actor.x=x;
       actor.y=y;
+      traveled+=length/steps;
     }
+    return traveled;
   }
 
   function unleash(f){
@@ -389,7 +421,20 @@ function createMatch(){
       closest=d;
       if (other===focused) break;
     }
-    if (target) damage(f,target,move.damage,f.action==='voice' ? 'magic' : 'hit');
+    if(!target) return;
+    const hp=target.hp;
+    damage(f,target,move.damage,f.action==='voice'?'magic':'hit');
+    if(target.kind==='hero' && target.hp<hp && target.hp>0 && move!==ACTIONS.voice){
+      const force=move===ACTIONS.kick?6:3.2;
+      const gap=distance(f,target);
+      target.impulseX+=(gap>.05?(target.x-f.x)/gap:f.dx)*force;
+      target.impulseY+=(gap>.05?(target.y-f.y)/gap:f.dy)*force;
+      const speed=Math.hypot(target.impulseX,target.impulseY);
+      if(speed>8){
+        target.impulseX*=8/speed;
+        target.impulseY*=8/speed;
+      }
+    }
   }
 
   function wave(){
