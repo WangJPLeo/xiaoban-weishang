@@ -73,9 +73,8 @@ function updateHud(){
       button.title=ultimateNotes.get(skill) || '';
     }
   }
-  const structures=current?.structures || Arena.TOWERS;
-  setText('blueTowers',structures.filter(s=>s.team===0 && s.kind==='tower' && s.hp>0).length+' / 3');
-  setText('redTowers',structures.filter(s=>s.team===1 && s.kind==='tower' && s.hp>0).length+' / 3');
+  setText('blueScore',String(current?.teamScores[0] || 0));
+  setText('redScore',String(current?.teamScores[1] || 0));
   const result=$('matchResult');
   const winner=current?.winner;
   const down=player && !player.hp;
@@ -122,7 +121,7 @@ $('officeLabels').append(officeLabel);
 function drawLabels(state){
   for(const {room,label} of officeLabels) place(label,room.x+room.w/2,room.y+.22,1.61);
   place(officeLabel,22.7,22.25,.1);
-  for(const fighter of [...state.players,...state.structures]){
+  for(const fighter of state.players){
     const {badge,segments,speech}=labels.get(fighter.id);
     badge.classList.toggle('self',fighter.id===self);
     badge.hidden=fighter.hp<=0;
@@ -131,8 +130,7 @@ function drawLabels(state){
       speech.hidden=true;
       continue;
     }
-    const hero=fighter.kind==='hero';
-    const z=hero ? 2.24+Arena.heightAt(fighter,state.time)*1.21 : fighter.kind==='core'?5.35:2.95;
+    const z=2.38+Arena.heightAt(fighter,state.time)*1.35;
     place(badge,fighter.x,fighter.y,z);
     const ratio=fighter.hp/fighter.maxHp*5;
     segments.forEach((segment,index)=>{
@@ -158,10 +156,10 @@ function refreshLabels(entities){
   for(const f of entities){
     if(labels.has(f.id)) continue;
     const badge=document.createElement('div');
-    badge.className='unit-label '+(f.team?'red':'blue')+(f.id===self?' self':'')+(f.kind==='hero'?' hero':' structure');
+    badge.className='unit-label '+(f.team?'red':'blue')+(f.id===self?' self':'')+' hero';
     const name=document.createElement('span');
     name.className='unit-name';
-    name.textContent=f.kind==='hero'?f.name:f.kind==='core'?'基地水晶':'防御塔';
+    name.textContent=f.name;
     const health=document.createElement('div');
     health.className='unit-health';
     const segments=Array.from({length:5},()=>{
@@ -180,7 +178,7 @@ function refreshLabels(entities){
   }
 }
 
-const attract={time:0,players:[],units:[],structures:[...Arena.TOWERS,...Arena.CORES],events:[]};
+const attract={time:0,players:[],events:[]};
 function interpolateActors(from,to,mix){
   const oldById=new Map(from.map(actor=>[actor.id,actor]));
   return to.map(actor=>{
@@ -210,7 +208,7 @@ function frameAt(now,dt){
   const players=interpolateActors(a.players,b.players,mix).filter(player=>currentIds.has(player.id));
   const displayed=new Set(players.map(player=>player.id));
   for(const player of current.players) if(!displayed.has(player.id)) players.push(player);
-  return {...base,time:frameTime,players,units:interpolateActors(a.units,b.units,mix)};
+  return {...base,time:frameTime,players};
 }
 
 function render(now){
@@ -240,7 +238,7 @@ function accept(state){
   self=state.self;
   current=state;
   connected=true;
-  refreshLabels([...state.players,...state.structures]);
+  refreshLabels(state.players);
   if(state.time-lastMinimap>=120 || state.time<lastMinimap){
     view?.drawMap(state,self);
     lastMinimap=state.time;
@@ -488,12 +486,12 @@ function pointTarget(event){
   const rect=canvas.getBoundingClientRect();
   const x=event.clientX-rect.left,y=event.clientY-rect.top;
   let focus=null, closest=Infinity;
-  for(const target of [...current.players,...current.units,...current.structures]){
+  for(const target of current.players){
     if(!target.hp || target.team===hero.team) continue;
-    const height=target.kind==='core'?2.5:target.kind==='tower'?1.15:target.kind==='hero'?.97:.4;
+    const height=1.03;
     const [tx,ty]=view.project(target.x,target.y,height);
     const distance=Math.hypot(tx-x,ty-y);
-    const radius=target.kind==='core'?25:target.kind==='minion'?9:16;
+    const radius=22;
     if(distance<radius && distance<closest){focus=target;closest=distance;}
   }
   send(focus?{type:'focus',id:focus.id}:{type:'target',x:point.x,y:point.y});
@@ -529,7 +527,7 @@ canvas.addEventListener('lostpointercapture',finishPointer);
 
 try{
   view=Rift.create(canvas);
-  refreshLabels(attract.structures);
+  refreshLabels(attract.players);
   view.drawMap(attract,self);
 }catch(error){
   console.error(error);

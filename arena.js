@@ -2,12 +2,8 @@
 'use strict';
 
 const FLOOR={w:46,h:29};
-const BASES=[{x:3.55,y:14.5},{x:42.45,y:14.5}];
-const LANES=[
-  [[3.55,14.5],[6,10],[9,4.7],[15,3.8],[23,3.8],[31,3.8],[37,4.7],[40,10],[42.45,14.5]],
-  [[3.55,14.5],[9,14.5],[17,14.5],[23,14.5],[29,14.5],[37,14.5],[42.45,14.5]],
-  [[3.55,14.5],[6,19],[9,24.3],[15,25.2],[23,25.2],[31,25.2],[37,24.3],[40,19],[42.45,14.5]]
-].map(lane=>lane.map(([x,y])=>({x,y})));
+const TEAM_STARTS=[{x:4.6,y:15.3},{x:41.4,y:15.3}];
+const SCORE_LIMIT=15;
 const OFFICE_ROOMS=[
   {name:'会议室',x:9.25,y:6.65,w:8,d:5.45,color:'#718e83'},
   {name:'厕所',x:19,y:6.65,w:8,d:5.45,color:'#8eacaf'},
@@ -17,13 +13,7 @@ const OFFICE_WALLS=OFFICE_ROOMS.flatMap(({x,y,w,d})=>[
   [x,y,w,.17],[x,y+.17,.16,d-.17],[x+w-.16,y+.17,.16,d-.17],
   [x,y+d,w/2-.86,.17],[x+w/2+.86,y+d,w/2-.86,.17]
 ]);
-const OFFICE_DESKS=[11,14.4,19.3,22.7,27.5,30.9,34.3].flatMap(x=>[18,20.4].map(y=>({x,y})));
-const TOWERS=LANES.flatMap((_,lane)=>[0,1].map(team=>({
-  id:'tower-'+lane+'-'+team,team,lane,kind:'tower',x:team===0 ? 14 : 32,
-  y:[4.25,14.5,24.75][lane],hp:140,maxHp:140
-})));
-const CORES=BASES.map((base,team)=>({...base,id:'core-'+team,team,kind:'core',hp:220,maxHp:220}));
-const createStructures=()=>[...TOWERS,...CORES].map(s=>({...s,nextAttack:0}));
+const OFFICE_DESKS=[9.5,13,16.5,21.2,24.7,29.4,32.9,36.4].flatMap(x=>[18.4,22.1].map(y=>({x,y})));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
 const CAPACITY = 10;
@@ -187,13 +177,12 @@ function heightAt(fighter,time){
 
 function createMatch(){
   const players=new Map();
-  const units=new Map();
-  let structures=createStructures();
-  let time=0, nextWave=1200, unitId=0, winner=null, restartAt=0, events=[];
+  let time=0,winner=null,restartAt=0,events=[];
+  const teamScores=[0,0];
 
   function spawn(fighter){
     const side=fighter.team===0 ? 1 : -1;
-    const base=BASES[fighter.team];
+    const base=TEAM_STARTS[fighter.team];
     const positions=Array.from({length:5},(_,i)=>{
       const slot=(fighter.color+i)%5;
       return {x:base.x+side*(1.64+slot%2*.7),y:base.y+(slot-2)*.89};
@@ -205,7 +194,7 @@ function createMatch(){
   }
 
   function add(id,name,color,role,bot=false){
-    const fighter={id,name,color,role,team:color%2,bot,kind:'hero',score:0,voiceIndex:0,line:null,nextAI:0,ultimateReadyAt:0};
+    const fighter={id,name,color,role,team:color%2,bot,score:0,voiceIndex:0,line:null,nextAI:0,ultimateReadyAt:0};
     spawn(fighter);
     players.set(id,fighter);
     return fighter;
@@ -297,7 +286,7 @@ function createMatch(){
   }
 
   function enemyById(f,id){
-    const target=players.get(id) || units.get(id) || structures.find(s=>s.id===id);
+    const target=players.get(id);
     return target && target.team!==f.team && target.hp>0 ? target : null;
   }
 
@@ -345,32 +334,28 @@ function createMatch(){
     else if (canStand(f.x,y) && y!==f.y){ f.y=y; f.moving=true; }
   }
 
-  function protectedCore(target){
-    return target.kind==='core' && structures.some(s=>s.team===target.team && s.kind==='tower' && s.hp>0);
-  }
-
   function defeat(source,target,credit=true){
     target.hp=0;
-    if(target.kind==='core'){
-      winner=source.team;
-      restartAt=time+10000;
-    }else if(target.kind==='hero'){
-      if(credit && source.kind==='hero' && source.team!==target.team) source.score++;
-      Object.assign(target,{action:'ko',actionAt:time,spawnAt:time+5300,moving:false,path:[],target:null});
-    }else if(target.kind==='minion') units.delete(target.id);
+    if(credit && source.team!==target.team){
+      source.score++;
+      if(++teamScores[source.team]>=SCORE_LIMIT){
+        winner=source.team;
+        restartAt=time+10000;
+      }
+    }
+    Object.assign(target,{action:'ko',actionAt:time,spawnAt:time+5300,moving:false,path:[],target:null});
   }
 
   function damage(source,target,amount,kind){
     if(!target.hp || target.safeUntil>time || winner!==null) return;
-    const immune=protectedCore(target);
     const absorbed=target.shieldUntil>time ? Math.min(amount,target.shield) : 0;
     if(absorbed) target.shield-=absorbed;
-    const actual=immune ? 0 : Math.min(target.hp,amount-absorbed);
+    const actual=Math.min(target.hp,amount-absorbed);
     target.hp-=actual;
-    events.push({x:target.x,y:target.y,fromX:source.x,fromY:source.y,team:source.team,
-      kind:immune || !actual ? 'shield' : !target.hp ? 'ko' : kind,damage:actual,t:time});
+    events.push({x:target.x,y:target.y,
+      kind:!actual ? 'shield' : !target.hp ? 'ko' : kind,damage:actual,t:time});
     if(!target.hp) defeat(source,target);
-    else if(target.kind==='hero' && actual && kind!=='bolt' && target.action!=='ultimate'){
+    else if(actual && target.action!=='ultimate'){
       target.action='hurt';
       target.actionAt=time;
     }
@@ -408,12 +393,12 @@ function createMatch(){
       if(skill.haste) ally.hasteUntil=time+skill.haste;
     }
     if(!skill.damage) return;
-    const enemies=[...players.values(),...units.values()].filter(hero=>hero.hp && hero.team!==f.team &&
+    const enemies=[...players.values()].filter(hero=>hero.hp && hero.team!==f.team &&
       !(hero.safeUntil>time) && distance(f,hero)<=skill.radius && clearWalk(f,hero));
-    enemies.sort((a,b)=>Number(b.kind==='hero')-Number(a.kind==='hero') || distance(f,a)-distance(f,b));
+    enemies.sort((a,b)=>distance(f,a)-distance(f,b));
     for(const enemy of skill.single?enemies.slice(0,1):enemies){
       damage(f,enemy,skill.damage,'magic');
-      if(!enemy.hp || enemy.kind!=='hero') continue;
+      if(!enemy.hp) continue;
       if(skill.stun) enemy.stunUntil=Math.max(enemy.stunUntil,time+skill.stun);
       if(skill.slow) enemy.slowUntil=Math.max(enemy.slowUntil,time+skill.slow);
       if(skill.pull){
@@ -427,10 +412,10 @@ function createMatch(){
   function strike(f,move){
     let target=null, closest=Infinity;
     const focused=enemyById(f,f.focus);
-    for (const other of focused ? [focused,...players.values(),...units.values(),...structures] : [...players.values(),...units.values(),...structures]){
+    for (const other of focused ? [focused,...players.values()] : players.values()){
       if (other.team===f.team || !other.hp || other.safeUntil>time ||
         (move!==ACTIONS.voice && heightAt(other,time)>.48)) continue;
-      const d=distance(f,other),reach=move.range+(other.kind==='core' ? .9 : other.kind==='tower' ? .48 : 0);
+      const d=distance(f,other),reach=move.range;
       if (d>reach || d>=closest || (d>.25 && (other.x-f.x)*f.dx+(other.y-f.y)*f.dy<d*move.arc)) continue;
       if (!clearWalk(f,other)) continue;
       target=other;
@@ -440,7 +425,7 @@ function createMatch(){
     if(!target) return;
     const hp=target.hp;
     damage(f,target,move.damage,f.action==='voice'?'magic':'hit');
-    if(target.kind==='hero' && target.hp<hp && target.hp>0 && move!==ACTIONS.voice){
+    if(target.hp<hp && target.hp>0 && move!==ACTIONS.voice){
       const force=move===ACTIONS.kick?6:3.2;
       const gap=distance(f,target);
       target.impulseX+=(gap>.05?(target.x-f.x)/gap:f.dx)*force;
@@ -449,21 +434,6 @@ function createMatch(){
       if(speed>8){
         target.impulseX*=8/speed;
         target.impulseY*=8/speed;
-      }
-    }
-  }
-
-  function wave(){
-    for (let lane=0;lane<LANES.length;lane++){
-      for (const team of [0,1]){
-        const path=team===0 ? LANES[lane] : LANES[lane].slice().reverse();
-        for (let i=0;i<3;i++){
-          const id='minion-'+(++unitId);
-          const offset=(i-1)*.52;
-          const route=path.map(p=>({x:p.x,y:p.y+offset}));
-          units.set(id,{ id,team,lane,kind:'minion',ranged:i===2,x:route[0].x,y:route[0].y,
-            dx:team===0?1:-1,dy:0,route,step:1,hp:27,maxHp:27,nextAttack:time+i*120,moving:true });
-        }
       }
     }
   }
@@ -478,41 +448,12 @@ function createMatch(){
     return best;
   }
 
-  function minions(dt){
-    const living=[...units.values()];
-    for (const unit of living){
-      if (!unit.hp) continue;
-      const reach=unit.ranged ? 2.6 : 1.12;
-      const enemies=[...living.filter(u=>u.lane===unit.lane),...players.values(),...structures.filter(s=>s.lane===unit.lane || s.kind==='core')];
-      const target=nearest(unit,enemies,reach) || nearest(unit,enemies,reach+1.35);
-      unit.moving=false;
-      if (target && face(unit,target)<=reach){
-        if (time>=unit.nextAttack){
-          damage(unit,target,unit.ranged ? 4 : 5,unit.ranged ? 'bolt' : 'hit');
-          unit.nextAttack=time+960;
-        }
-        continue;
-      }
-      const point=target || unit.route[unit.step];
-      if (!point) continue;
-      const remaining=face(unit,point);
-      if (!target && remaining<.16){ unit.step++; continue; }
-      const step=Math.min(dt*2.55,remaining);
-      const x=unit.x+unit.dx*step,y=unit.y+unit.dy*step;
-      if (canStand(x,y)){ unit.x=x; unit.y=y; unit.moving=true; }
-      else if (!target) unit.step++;
-    }
-  }
-
   function controlBot(f){
     if (!f.bot || time<f.nextAI || f.action!=='idle' || f.stunUntil>time) return;
     f.nextAI=time+350+Math.random()*300;
-    const targets=[...units.values(),...players.values()];
-    const local=nearest(f,targets,5.2);
-    const lane=f.color%3;
-    const objective=structures.find(s=>s.team!==f.team && s.kind==='tower' && s.lane===lane && s.hp) ||
-      structures.find(s=>s.team!==f.team && s.kind==='tower' && s.hp) ||
-      structures.find(s=>s.team!==f.team && s.kind==='core');
+    const local=nearest(f,players.values(),5.2);
+    const opponent=local || [...players.values()].filter(hero=>hero.hp && hero.team!==f.team)
+      .sort((a,b)=>distance(f,a)-distance(f,b))[0];
     const skill=ultimateFor(f);
     const hasTarget=local && distance(f,local)<=skill.radius;
     const needsSupport=(skill.heal || skill.shield || skill.haste) && [...players.values()].some(hero=>
@@ -522,7 +463,7 @@ function createMatch(){
       input(f.id,{type:'action',action:'ultimate'});
       return;
     }
-    const focus=(local || objective)?.id;
+    const focus=opponent?.id;
     if(f.focus!==focus){
       f.focus=focus;
       f.target=null;
@@ -539,7 +480,7 @@ function createMatch(){
       f.target=null;
       return;
     }
-    const reach=target.kind==='core' ? 2.3 : target.kind==='tower' ? 1.95 : 1.5;
+    const reach=1.5;
     if (distance(f,target)<=reach && clearWalk(f,target)){
       f.path=[];
       f.target=null;
@@ -554,11 +495,10 @@ function createMatch(){
   }
 
   function reset(){
-    structures=createStructures();
-    units.clear();
     winner=null;
-    nextWave=time+1200;
-    for (const f of players.values()){ f.score=0; spawn(f); }
+    teamScores.fill(0);
+    events=[];
+    for (const f of players.values()){ f.score=0; f.ultimateReadyAt=0; spawn(f); }
   }
 
   function tick(ms){
@@ -569,47 +509,28 @@ function createMatch(){
       if (time>=restartAt) reset();
       return;
     }
-    if (time>=nextWave){
-      if (units.size<=72) wave();
-      nextWave=time+13500;
-    }
     for (const f of players.values()){
+      if(winner!==null) break;
       if (!f.hp){ if (time>=f.spawnAt) spawn(f); continue; }
       const moveDef=ACTIONS[f.action], elapsed=time-f.actionAt;
       if ((moveDef && elapsed>=moveDef.duration) || (f.action==='hurt' && elapsed>=210)) action(f,'idle');
-      if (distance(f,BASES[f.team])<3.15) f.hp=Math.min(f.maxHp,f.hp+ms*.015);
+      if (distance(f,TEAM_STARTS[f.team])<2.15) f.hp=Math.min(f.maxHp,f.hp+ms*.015);
       controlBot(f);
       chase(f);
       move(f,ms/1000);
-      if(f.action==='kick' && elapsed>=620 && elapsed-ms<620){
-        events.push({kind:'landing',id:f.id,x:f.x,y:f.y,team:f.team,t:time});
-      }
       const attack=ACTIONS[f.action];
       if (attack?.strike && !f.struck && time-f.actionAt>=attack.strike){
         f.struck=true;
         if(f.action==='ultimate') unleash(f);
-        else {
-          events.push({kind:f.action,id:f.id,x:f.x,y:f.y,dx:f.dx,dy:f.dy,team:f.team,t:time});
-          strike(f,attack);
-        }
+        else strike(f,attack);
       }
-    }
-    if (winner!==null) return;
-    minions(ms/1000);
-    for (const tower of structures){
-      if (tower.kind!=='tower' || !tower.hp || time<tower.nextAttack) continue;
-      const target=nearest(tower,units.values(),4.6) || nearest(tower,players.values(),4.6);
-      if (!target) continue;
-      damage(tower,target,13,'bolt');
-      tower.nextAttack=time+1070;
     }
   }
 
   function snapshot(){
-    return {time,events,winner,restartAt,units:[...units.values()].map(({route,step,nextAttack,...u})=>u),
-      structures:structures.map(({nextAttack,...s})=>s),
+    return {time,events,winner,restartAt,teamScores:teamScores.slice(),
       players:[...players.values()].map(p=>({
-        id:p.id,name:p.name,color:p.color,role:p.role,team:p.team,bot:p.bot,kind:p.kind,x:p.x,y:p.y,dx:p.dx,dy:p.dy,
+        id:p.id,name:p.name,color:p.color,role:p.role,team:p.team,bot:p.bot,x:p.x,y:p.y,dx:p.dx,dy:p.dy,
         hp:p.hp,maxHp:p.maxHp,score:p.score,action:p.action,actionAt:p.actionAt,moving:p.moving,target:p.target,
         safeUntil:p.safeUntil,spawnAt:p.spawnAt,ultimateReadyAt:p.ultimateReadyAt,shield:p.shieldUntil>time?p.shield:0,line:p.action==='voice' ? p.line : null
       })) };
@@ -621,7 +542,7 @@ function createMatch(){
   }};
 }
 
-const api={ FLOOR,BASES,LANES,OFFICE_ROOMS,OFFICE_WALLS,OFFICE_DESKS,TOWERS,CORES,CAPACITY,ACTIONS,ROLES,NICKNAME_LIMIT,VOICE_LINES,parseNickname,ultimateFor,canStand,heightAt,createMatch };
+const api={ FLOOR,TEAM_STARTS,SCORE_LIMIT,OFFICE_ROOMS,OFFICE_WALLS,OFFICE_DESKS,CAPACITY,ACTIONS,ROLES,NICKNAME_LIMIT,VOICE_LINES,parseNickname,ultimateFor,canStand,heightAt,createMatch };
 if (typeof module!=='undefined' && module.exports) module.exports=api;
 else root.Arena=api;
 })(globalThis);

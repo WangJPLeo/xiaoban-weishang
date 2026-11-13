@@ -28,15 +28,15 @@
     </header>
 
     <section class="metrics" aria-label="对局状态">
-      <div class="metric"><span>我的英雄</span><strong id="playerName">—</strong></div>
+      <div class="metric"><span>我的角色</span><strong id="playerName">—</strong></div>
       <div class="metric"><span>我的击倒</span><strong id="score">—</strong></div>
       <div class="metric"><span>场内人数</span><strong id="occupancy">—</strong></div>
     </section>
 
     <section class="stage" aria-labelledby="floorTitle">
       <div class="stage-info">
-        <h2 id="floorTitle">办公室战区</h2>
-        <p>点击地面移动 · 点击敌方目标攻击 · 滚轮缩放</p>
+        <h2 id="floorTitle">办公室对战</h2>
+        <p>先击倒 15 次获胜 · 点击移动或攻击 · 滚轮缩放</p>
       </div>
       <div class="queue-notice" id="queueNotice" hidden role="status">
         <strong id="queuePosition"></strong><span>可以观战，有空位时自动进场</span>
@@ -45,13 +45,13 @@
         <canvas id="gameCanvas" width="1152" height="592" aria-label="办公室、会议室、厕所和休息室组成的像素战场"></canvas>
         <div id="sceneOverlay" class="scene-overlay" aria-hidden="true"></div>
         <div class="office-labels" id="officeLabels" aria-hidden="true"></div>
-        <div class="match-score" aria-label="防御塔存活数">
-          <span class="blue">碧蓝 <b id="blueTowers">3 / 3</b></span>
-          <span class="red"><b id="redTowers">3 / 3</b> 赤焰</span>
+        <div class="match-score" aria-label="队伍击倒数，先到十五胜利">
+          <span class="blue">蓝队 <b id="blueScore">0</b></span>
+          <span class="red"><b id="redScore">0</b> 红队</span>
         </div>
         <div class="match-result" id="matchResult" role="status" hidden><strong id="resultTitle"></strong><span id="resultDetail"></span></div>
         <p class="graphics-error" id="graphicsError" hidden>这个浏览器无法开启 WebGL。请启用硬件加速后重新加载。</p>
-        <div class="minimap"><canvas id="minimap" width="252" height="158" aria-label="峡谷小地图"></canvas></div>
+        <div class="minimap"><canvas id="minimap" width="252" height="158" aria-label="办公室小地图"></canvas></div>
       </div>
       <div class="actions" id="actions" aria-label="英雄技能"></div>
     </section>
@@ -75,7 +75,7 @@
       </fieldset>
       <div class="role-footer">
         <button class="role-idea" type="button" id="roleIdea">打开 IDEA <kbd>F</kbd></button>
-        <button class="enter-fight" id="enterFight" type="submit" disabled>进入峡谷</button>
+        <button class="enter-fight" id="enterFight" type="submit" disabled>进入办公室</button>
       </div>
     </form>
   </dialog>
