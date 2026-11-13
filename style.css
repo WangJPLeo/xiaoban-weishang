@@ -132,3 +132,6 @@ h1{font-family:Georgia,"Songti SC","Noto Serif CJK SC",serif;letter-spacing:.115
 .skill-cooldown{color:#e5cba4;font:700 12px ui-monospace,monospace}
 .unit-label.shielded .unit-health{outline:1px solid #e5ca8d;box-shadow:0 0 7px #e5ca8d}
 @media(max-width:560px){.actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.office-labels{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.office-label{position:absolute;transform:translate(-50%,-100%);padding:2px 7px;border:1px solid #809b9a;background:#192b34e8;color:#fff0c9;white-space:nowrap;font-size:11px;font-weight:700}

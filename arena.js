@@ -8,10 +8,16 @@ const LANES=[
   [[3.55,14.5],[9,14.5],[17,14.5],[23,14.5],[29,14.5],[37,14.5],[42.45,14.5]],
   [[3.55,14.5],[6,19],[9,24.3],[15,25.2],[23,25.2],[31,25.2],[37,24.3],[40,19],[42.45,14.5]]
 ].map(lane=>lane.map(([x,y])=>({x,y})));
-const CLIFFS=[
-  [10.5,8.3,5.2,3.1],[17,7,2.7,3.7],[25.7,7.7,3.5,3.3],[31,8.2,4.7,3.1],
-  [10.5,18,5.2,3],[17,18.8,2.7,3.7],[25.7,18,3.5,3.3],[31,18,4.7,3.1]
+const OFFICE_ROOMS=[
+  {name:'会议室',x:9.25,y:6.65,w:8,d:5.45,color:'#718e83'},
+  {name:'厕所',x:19,y:6.65,w:8,d:5.45,color:'#8eacaf'},
+  {name:'休息室',x:28.75,y:6.65,w:8,d:5.45,color:'#a58567'}
 ];
+const OFFICE_WALLS=OFFICE_ROOMS.flatMap(({x,y,w,d})=>[
+  [x,y,w,.17],[x,y+.17,.16,d-.17],[x+w-.16,y+.17,.16,d-.17],
+  [x,y+d,w/2-.86,.17],[x+w/2+.86,y+d,w/2-.86,.17]
+]);
+const OFFICE_DESKS=[11,14.4,19.3,22.7,27.5,30.9,34.3].flatMap(x=>[18,20.4].map(y=>({x,y})));
 const TOWERS=LANES.flatMap((_,lane)=>[0,1].map(team=>({
   id:'tower-'+lane+'-'+team,team,lane,kind:'tower',x:team===0 ? 14 : 32,
   y:[4.25,14.5,24.75][lane],hp:140,maxHp:140
@@ -69,7 +75,15 @@ function ultimateFor(hero){
   if(hero?.name?.includes('柴') && hero.name.includes('杰')) return ECLIPSE;
   return Object.hasOwn(ULTIMATES,hero?.role) ? ULTIMATES[hero.role] : ULTIMATES['运营'];
 }
-const obstacles=CLIFFS.map(([x,y,w,d])=>({x,y,w,d}));
+const obstacles=OFFICE_WALLS.map(([x,y,w,d])=>({x,y,w,d})).concat(OFFICE_DESKS.map(({x,y})=>({x:x-.75,y:y-.385,w:1.5,d:1.36})));
+const [meeting,toilet,lounge]=OFFICE_ROOMS;
+obstacles.push(
+  {x:meeting.x+2.55,y:meeting.y+1.89,w:2.9,d:1.25},
+  {x:lounge.x+1.39,y:lounge.y+.94,w:2.42,d:.95},
+  {x:lounge.x+1.87,y:lounge.y+2.93,w:1.45,d:.78},
+  {x:lounge.x+5.62,y:lounge.y+.73,w:1.45,d:.74},
+  ...[1.23,3.27,5.31].map(x=>({x:toilet.x+x-.35,y:toilet.y+.91,w:.7,d:.9}))
+);
 const STEP = .48;
 const COLS = Math.floor(FLOOR.w/STEP);
 const ROWS = Math.floor(FLOOR.h/STEP);
@@ -607,7 +621,7 @@ function createMatch(){
   }};
 }
 
-const api={ FLOOR,BASES,LANES,CLIFFS,TOWERS,CORES,CAPACITY,ACTIONS,ROLES,NICKNAME_LIMIT,VOICE_LINES,parseNickname,ultimateFor,canStand,heightAt,createMatch };
+const api={ FLOOR,BASES,LANES,OFFICE_ROOMS,OFFICE_WALLS,OFFICE_DESKS,TOWERS,CORES,CAPACITY,ACTIONS,ROLES,NICKNAME_LIMIT,VOICE_LINES,parseNickname,ultimateFor,canStand,heightAt,createMatch };
 if (typeof module!=='undefined' && module.exports) module.exports=api;
 else root.Arena=api;
 })(globalThis);

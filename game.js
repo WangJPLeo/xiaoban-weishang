@@ -107,7 +107,21 @@ function place(el,x,y,z){
   el.style.top=top+'px';
 }
 
+const officeLabels=Arena.OFFICE_ROOMS.map(room=>{
+  const label=document.createElement('span');
+  label.className='office-label';
+  label.textContent=room.name;
+  $('officeLabels').append(label);
+  return {room,label};
+});
+const officeLabel=document.createElement('span');
+officeLabel.className='office-label';
+officeLabel.textContent='办公区';
+$('officeLabels').append(officeLabel);
+
 function drawLabels(state){
+  for(const {room,label} of officeLabels) place(label,room.x+room.w/2,room.y+.22,1.61);
+  place(officeLabel,22.7,22.25,.1);
   for(const fighter of [...state.players,...state.structures]){
     const {badge,segments,speech}=labels.get(fighter.id);
     badge.classList.toggle('self',fighter.id===self);

@@ -35,15 +35,16 @@
 
     <section class="stage" aria-labelledby="floorTitle">
       <div class="stage-info">
-        <h2 id="floorTitle">晶石峡谷</h2>
+        <h2 id="floorTitle">办公室战区</h2>
         <p>点击地面移动 · 点击敌方目标攻击 · 滚轮缩放</p>
       </div>
       <div class="queue-notice" id="queueNotice" hidden role="status">
         <strong id="queuePosition"></strong><span>可以观战，有空位时自动进场</span>
       </div>
       <div class="scene">
-        <canvas id="gameCanvas" width="1152" height="592" aria-label="三路峡谷像素战场"></canvas>
+        <canvas id="gameCanvas" width="1152" height="592" aria-label="办公室、会议室、厕所和休息室组成的像素战场"></canvas>
         <div id="sceneOverlay" class="scene-overlay" aria-hidden="true"></div>
+        <div class="office-labels" id="officeLabels" aria-hidden="true"></div>
         <div class="match-score" aria-label="防御塔存活数">
           <span class="blue">碧蓝 <b id="blueTowers">3 / 3</b></span>
           <span class="red"><b id="redTowers">3 / 3</b> 赤焰</span>
