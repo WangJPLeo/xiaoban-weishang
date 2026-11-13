@@ -363,7 +363,7 @@ function create(canvas){
     }
   }
 
-  function cameraAt(self,dt){
+  function cameraAt(self,dt,events,time){
     if(self && !entered){
       zoom=1.5;
       selected.set(clamp(self.x,7,39),0,clamp(self.y,5,24));
@@ -382,8 +382,18 @@ function create(canvas){
       vector.set(clamp(self.x,7,39),0,clamp(self.y,5,24));
       selected.lerp(vector,1-Math.exp(-dt*9));
     }
-    camera.position.set(selected.x-2.8,35,selected.z+25);
-    camera.lookAt(selected.x,.18,selected.z);
+    let shake=0;
+    if(self){
+      for(const event of events){
+        const age=time-event.t;
+        if(age<0 || age>330 || (event.id!==self.id && event.kind!=='eclipse')) continue;
+        const strength=event.kind==='eclipse'?.31:event.kind==='ultimate'?.21:event.kind==='landing'?.16:event.kind==='punch'?.08:0;
+        shake=Math.max(shake,strength*(1-age/330)**2);
+      }
+    }
+    const swayX=Math.sin(time*.091)*shake,swayZ=Math.cos(time*.112)*shake;
+    camera.position.set(selected.x-2.8+swayX,35,selected.z+25+swayZ);
+    camera.lookAt(selected.x+swayX,.18,selected.z+swayZ);
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
   }
@@ -507,10 +517,105 @@ function create(canvas){
 
   }
 
+  const sparkCount=448;
+  const sparks=new THREE.InstancedMesh(boxGeometry,new THREE.MeshBasicMaterial({color:0xffffff}),sparkCount);
+  sparks.frustumCulled=false;
+  sparks.count=0;
+  world.add(sparks);
+  const spark=new THREE.Object3D(),sparkTint=new THREE.Color();
+  let sparkIndex=0;
+  function pixel(x,y,z,sx,sy,sz,yaw,color){
+    if(sparkIndex>=sparkCount) return;
+    spark.position.set(x,y,z);
+    spark.scale.set(sx,sy,sz);
+    spark.rotation.set(0,yaw,0);
+    spark.updateMatrix();
+    sparks.setMatrixAt(sparkIndex,spark.matrix);
+    sparks.setColorAt(sparkIndex++,sparkTint.setHex(color));
+  }
+
+  function slash(event,t){
+    const heading=Math.atan2(event.dx,event.dy);
+    for(let i=0;i<18;i++){
+      const angle=heading-.98+i*.115+(t-.25)*.65;
+      const radius=.88+i*.067+t*.42;
+      const size=(1-t)*(.09+i*.014);
+      const x=event.x+Math.sin(angle)*radius,z=event.y+Math.cos(angle)*radius;
+      const y=.78+Math.sin(i/17*Math.PI)*.92;
+      pixel(x,y,z,size*.73,size,.20+size,angle,i>12?0xfff7b8:i%2?0xffaa4d:0xffe071);
+      pixel(x,y-.23,z,size*.7,size*.6,size*.7,angle,0xff762c);
+    }
+  }
+
+  function resonance(event,t){
+    const heading=Math.atan2(event.dx,event.dy);
+    for(let wave=0;wave<3;wave++){
+      const stage=t*1.55-wave*.22;
+      if(stage<=0 || stage>=1) continue;
+      const reach=.57+stage*3.8;
+      for(let i=0;i<11;i++){
+        const angle=heading-.69+i*.138;
+        const x=event.x+Math.sin(angle)*reach,z=event.y+Math.cos(angle)*reach;
+        const y=.95+Math.cos((i-5)*.31)*.49;
+        pixel(x,y,z,.16,.14+(1-stage)*.36,.17,angle,i%3===0?0xf9d7ff:wave%2?0x8d91ff:0xd56cff);
+      }
+    }
+  }
+
+  function comet(event,t){
+    for(let i=0;i<23;i++){
+      const along=(i-10)*.12+(t*1.75);
+      const across=Math.sin(i*2.72)*(.17+t*.54);
+      const x=event.x+event.dx*along+event.dy*across,z=event.y+event.dy*along-event.dx*across;
+      const y=.10+(i%5)*.235+Math.sin(t*Math.PI)*.52;
+      const size=(1-t)*(.09+i%4*.05);
+      pixel(x,y,z,size,.09+size*.4,.54+size,Math.atan2(event.dx,event.dy),i%5===0?0xf6fcff:i%2?0x54fff1:0x37a5ff);
+    }
+  }
+
+  function eruption(event,t){
+    const global=event.kind==='eclipse';
+    const radius=event.radius || 24;
+    const count=global?32:24;
+    for(let i=0;i<count;i++){
+      const angle=i/count*Math.PI*2+t*.19;
+      const reach=radius*(.25+Math.sqrt(t)*.78)*(i%2?.82:1);
+      const x=event.x+Math.sin(angle)*reach,z=event.y+Math.cos(angle)*reach;
+      const height=(1-t)*(i%3===0?1.55:.59)*(global?1.9:1);
+      pixel(x,height*.52+.07,z,.20+height*.09,height,.20,angle,global?(i%2?0xca65ff:0xffbbff):(i%2?palette[event.team]:0xffe2a0));
+      if(i%3===0) pixel(x,height+.34+t*.46,z,.21,.24,.21,angle+t*2,global?0xffe3ff:0xffffff);
+    }
+  }
+
+  function landing(event,t){
+    for(let i=0;i<13;i++){
+      const angle=i/13*Math.PI*2;
+      const radius=.20+t*1.8;
+      const x=event.x+Math.sin(angle)*radius,z=event.y+Math.cos(angle)*radius;
+      const size=.13+(1-t)*.15;
+      pixel(x,.06+Math.sin(t*Math.PI)*.68,z,size,size*.69,size,angle+t*3,i%3?0xb9a078:0xecd7ae);
+    }
+  }
+
+  const skillEffects={punch:slash,voice:resonance,kick:comet,landing,ultimate:eruption,eclipse:eruption};
+  function animatePixels(events,time){
+    sparkIndex=0;
+    for(const event of events){
+      if(!Object.hasOwn(skillEffects,event.kind)) continue;
+      const elapsed=time-event.t;
+      const duration=event.kind==='eclipse'?680:event.kind==='voice'?540:490;
+      if(elapsed<0 || elapsed>=duration) continue;
+      skillEffects[event.kind](event,elapsed/duration);
+    }
+    sparks.count=sparkIndex;
+    sparks.instanceMatrix.needsUpdate=true;
+    if(sparks.instanceColor) sparks.instanceColor.needsUpdate=true;
+  }
+
   function render(state,time,hero,dt){
     fit();
     if(!width || !height) return;
-    cameraAt(hero,dt);
+    cameraAt(hero,dt,state.events,time);
     const living=new Set();
     for(const f of [...state.players,...state.units]){
       living.add(f.id);
@@ -569,7 +674,7 @@ function create(canvas){
       burst.material.color.setHex(event.kind==='eclipse'?0xcf8cff:palette[event.team]);
     }
     effects.forEach(obj=>{obj.visible=false;});
-    state.events.filter(e=>e.kind!=='ultimate' && e.kind!=='eclipse').slice(-effects.length).forEach((event,i)=>{
+    state.events.filter(e=>!Object.hasOwn(skillEffects,e.kind)).slice(-effects.length).forEach((event,i)=>{
       const age=time-event.t;
       if(age<0 || age>540) return;
       const obj=effects[i],bolt=event.kind==='bolt';
@@ -593,6 +698,7 @@ function create(canvas){
       waterDetail.setMatrixAt(i,waveTransform.matrix);
     });
     waterDetail.instanceMatrix.needsUpdate=true;
+    animatePixels(state.events,time);
     renderer.render(world,camera);
   }
 

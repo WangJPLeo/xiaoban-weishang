@@ -267,6 +267,7 @@ function createMatch(){
       const target=enemyById(f,command.id);
       if (target){
         f.focus=target.id;
+        f.target=null;
         f.nextChase=0;
       }
     } else if (command.type==='action' && typeof command.action==='string' && Object.hasOwn(ACTIONS,command.action) && f.action==='idle' && !(f.stunUntil>time)){
@@ -377,7 +378,7 @@ function createMatch(){
 
   function unleash(f){
     const skill=ultimateFor(f);
-    events.push({x:f.x,y:f.y,team:f.team,kind:skill.global?'eclipse':'ultimate',label:skill.label,radius:skill.radius,t:time});
+    events.push({x:f.x,y:f.y,team:f.team,kind:skill.global?'eclipse':'ultimate',id:f.id,label:skill.label,radius:skill.radius,t:time});
     if(skill.global){
       for(const hero of players.values()) if(hero.hp) defeat(f,hero,false);
       return;
@@ -507,8 +508,12 @@ function createMatch(){
       input(f.id,{type:'action',action:'ultimate'});
       return;
     }
-    f.focus=(local || objective)?.id;
-    f.nextChase=0;
+    const focus=(local || objective)?.id;
+    if(f.focus!==focus){
+      f.focus=focus;
+      f.target=null;
+      f.nextChase=0;
+    }
   }
 
   function chase(f){
@@ -529,8 +534,8 @@ function createMatch(){
       face(f,target);
       if (time>=f.nextAuto && !(f.stunUntil>time)){ action(f,'punch'); f.nextAuto=time+720; }
     } else if (time>=(f.nextChase || 0)){
-      setTarget(f,target);
-      f.nextChase=time+380;
+      if(!f.path.length || !f.target || distance(f.target,target)>.75) setTarget(f,target);
+      f.nextChase=time+(f.bot?650:380);
     }
   }
 
@@ -562,11 +567,17 @@ function createMatch(){
       controlBot(f);
       chase(f);
       move(f,ms/1000);
+      if(f.action==='kick' && elapsed>=620 && elapsed-ms<620){
+        events.push({kind:'landing',id:f.id,x:f.x,y:f.y,team:f.team,t:time});
+      }
       const attack=ACTIONS[f.action];
       if (attack?.strike && !f.struck && time-f.actionAt>=attack.strike){
         f.struck=true;
         if(f.action==='ultimate') unleash(f);
-        else strike(f,attack);
+        else {
+          events.push({kind:f.action,id:f.id,x:f.x,y:f.y,dx:f.dx,dy:f.dy,team:f.team,t:time});
+          strike(f,attack);
+        }
       }
     }
     if (winner!==null) return;
