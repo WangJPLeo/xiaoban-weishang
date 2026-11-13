@@ -232,7 +232,8 @@ function createMatch(){
     fighter.vx=0;
     fighter.vy=0;
     fighter.path=findPath(fighter,target);
-    fighter.target=fighter.path.at(-1) || null;
+    const end=fighter.path.at(-1);
+    fighter.target=end ? {x:end.x,y:end.y} : null;
   }
 
   function face(fighter,target){
