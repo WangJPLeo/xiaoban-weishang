@@ -50,13 +50,12 @@ async function readJSON(req){
 }
 
 function promote(){
-  while (queue.length && match.players.size<CAPACITY){
-    const member=queue.shift();
-    const used=new Set([...match.players.values()].map(player=>player.color));
-    let color=0;
-    while (used.has(color)) color++;
-    match.add(member.id,member.name,color,member.role);
+  while(queue.length){
+    const member=queue[0];
+    if(!match.addHuman(member.id,member.name,member.role)) break;
+    queue.shift();
   }
+  match.fillTeams();
 }
 
 function leave(member){

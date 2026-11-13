@@ -171,13 +171,41 @@ function createMatch(){
   }
 
   function add(id,name,color,role,bot=false){
-    const count=[0,0];
-    for (const hero of players.values()) if (!hero.bot) count[hero.team]++;
-    const team=bot ? color%2 : count[0]<=count[1] ? 0 : 1;
-    const fighter={id,name,color,role,team,bot,kind:'hero',score:0,voiceIndex:0,line:null,nextAI:0};
+    const fighter={id,name,color,role,team:color%2,bot,kind:'hero',score:0,voiceIndex:0,line:null,nextAI:0};
     spawn(fighter);
     players.set(id,fighter);
     return fighter;
+  }
+
+  function addHuman(id,name,role){
+    const humans=[...players.values()].filter(hero=>!hero.bot);
+    if(humans.length>=CAPACITY) return null;
+    const blue=humans.filter(hero=>hero.team===0).length;
+    const team=blue<=humans.length-blue ? 0 : 1;
+    const taken=new Set(humans.map(hero=>hero.color));
+    let color=team;
+    while(taken.has(color)) color+=2;
+    const bot=[...players.values()].find(hero=>hero.bot && hero.color===color);
+    if(bot) players.delete(bot.id);
+    return add(id,name,color,role);
+  }
+
+  function fillTeams(){
+    const heroes=[...players.values()];
+    if(!heroes.some(hero=>!hero.bot)){
+      if(heroes.length){
+        players.clear();
+        reset();
+      }
+      return;
+    }
+    const used=new Set(heroes.map(hero=>hero.color));
+    const roles=['运营','测试','组长','运维','前台'];
+    for(let color=0;color<CAPACITY;color++){
+      if(used.has(color)) continue;
+      const role=roles[color%roles.length];
+      add('bot-'+color,'电脑 '+role,color,role,true);
+    }
   }
 
   function setTarget(fighter,target){
@@ -428,13 +456,13 @@ function createMatch(){
     return {time,events,winner,restartAt,units:[...units.values()].map(({route,step,nextAttack,...u})=>u),
       structures:structures.map(({nextAttack,...s})=>s),
       players:[...players.values()].map(p=>({
-        id:p.id,name:p.name,color:p.color,role:p.role,team:p.team,kind:p.kind,x:p.x,y:p.y,dx:p.dx,dy:p.dy,
+        id:p.id,name:p.name,color:p.color,role:p.role,team:p.team,bot:p.bot,kind:p.kind,x:p.x,y:p.y,dx:p.dx,dy:p.dy,
         hp:p.hp,maxHp:p.maxHp,score:p.score,action:p.action,actionAt:p.actionAt,moving:p.moving,target:p.target,
         safeUntil:p.safeUntil,spawnAt:p.spawnAt,line:p.action==='voice' ? p.line : null
       })) };
   }
 
-  return {players,add,input,tick,snapshot,remove(id){
+  return {players,add,addHuman,fillTeams,input,tick,snapshot,remove(id){
     players.delete(id);
     if (!players.size) reset();
   }};

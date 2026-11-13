@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 
-const {FLOOR,CAPACITY,ACTIONS,ROLES,parseNickname}=Arena;
+const {FLOOR,ACTIONS,ROLES,parseNickname}=Arena;
 const canvas=document.getElementById('gameCanvas');
 const sceneOverlay=document.getElementById('sceneOverlay');
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -13,7 +13,8 @@ const buttons=new Map();
 const practice=document.documentElement.dataset.mode!=='online';
 let selectedRole=null, nickname=null, ideaOpen=false;
 let self=practice?'local':null;
-let current=null, previous=null, receivedAt=0, connected=false;
+let current=null, connected=false, clockOffset=0, frameTime=null, lastFrame=0;
+const snapshots=[];
 let session=null, source=null, retry=0;
 let activePage=true, connecting=false;
 let leaderSignature='';
@@ -39,7 +40,8 @@ function updateHud(){
   if (position) setText('queuePosition','排队第 '+position+' 位');
   setText('playerName',player?.name || '—');
   setText('score',player ? String(player.score) : '—');
-  setText('occupancy',current ? practice ? current.players.length+' 人' : current.players.length+' / '+CAPACITY : '— / '+CAPACITY);
+  const humans=current?.players.filter(hero=>!hero.bot).length || 0;
+  setText('occupancy',current ? humans+' 真人 · '+(current.players.length-humans)+' 电脑' : '—');
   for (const [name,button] of buttons){
     button.disabled=!player?.hp || !connected || current?.winner!=null;
     button.classList.toggle('active',player?.action===name);
@@ -81,13 +83,14 @@ function place(el,x,y,z){
 function drawLabels(state){
   for(const fighter of [...state.players,...state.structures]){
     const {badge,segments,speech}=labels.get(fighter.id);
+    badge.classList.toggle('self',fighter.id===self);
     badge.hidden=fighter.hp<=0;
     if(badge.hidden){
       speech.hidden=true;
       continue;
     }
     const hero=fighter.kind==='hero';
-    const z=hero ? 2.3+Arena.heightAt(fighter,state.time)*1.12 : fighter.kind==='core'?5.35:2.95;
+    const z=hero ? 2.24+Arena.heightAt(fighter,state.time)*1.21 : fighter.kind==='core'?5.35:2.95;
     place(badge,fighter.x,fighter.y,z);
     const ratio=fighter.hp/fighter.maxHp*5;
     segments.forEach((segment,index)=>segment.style.width=(Math.max(0,Math.min(1,ratio-index))*100)+'%');
@@ -133,32 +136,64 @@ function refreshLabels(entities){
 }
 
 const attract={time:0,players:[],units:[],structures:[...Arena.TOWERS,...Arena.CORES],events:[]};
+function interpolateActors(from,to,mix){
+  const oldById=new Map(from.map(actor=>[actor.id,actor]));
+  return to.map(actor=>{
+    const old=oldById.get(actor.id);
+    if(!old || Math.hypot(actor.x-old.x,actor.y-old.y)>3) return actor;
+    const discrete=mix>=1 ? actor : old;
+    return {...discrete,x:lerp(old.x,actor.x,mix),y:lerp(old.y,actor.y,mix)};
+  });
+}
+
+function frameAt(now,dt){
+  if(!snapshots.length) return {...attract,time:now};
+  const first=snapshots[0];
+  const delay=practice ? 55 : 110;
+  const target=Math.max(first.time,Math.min(current.time,now-clockOffset-delay));
+  if(frameTime===null) frameTime=target;
+  else {
+    const rate=Math.max(.75,Math.min(1.3,1+(target-frameTime-1000*dt)*.009));
+    frameTime=Math.min(current.time,frameTime+dt*1000*rate);
+  }
+  while(snapshots.length>2 && snapshots[1].time<=frameTime) snapshots.shift();
+  const a=snapshots[0],b=snapshots[1] || a;
+  const mix=b.time>a.time ? Math.max(0,Math.min(1,(frameTime-a.time)/(b.time-a.time))) : 1;
+  const base=mix>=1 ? b : a;
+  // Keep new roster entries visible immediately while movement and actions follow the playback clock.
+  const currentIds=new Set(current.players.map(player=>player.id));
+  const players=interpolateActors(a.players,b.players,mix).filter(player=>currentIds.has(player.id));
+  const displayed=new Set(players.map(player=>player.id));
+  for(const player of current.players) if(!displayed.has(player.id)) players.push(player);
+  return {...base,time:frameTime,players,units:interpolateActors(a.units,b.units,mix)};
+}
+
 function render(now){
+  const dt=Math.min(.05,Math.max(0,(now-(lastFrame || now-16))/1000));
+  lastFrame=now;
   if(!ideaOpen && view){
-    const state=current || attract;
-    const span=previous ? state.time-previous.time : 0;
-    const mix=span>0?Math.min(1,(now-receivedAt)/span):1;
-    const time=span>0?lerp(previous.time,state.time,mix):current?state.time:now;
-    const interpolate=(next,old)=>{
-      const oldById=new Map((old || []).map(actor=>[actor.id,actor]));
-      return next.map(actor=>{
-        const p=oldById.get(actor.id);
-        if(!p || Math.hypot(actor.x-p.x,actor.y-p.y)>3) return actor;
-        return {...actor,x:lerp(p.x,actor.x,mix),y:lerp(p.y,actor.y,mix)};
-      });
-    };
-    const frame={...state,time,players:interpolate(state.players,previous?.players),units:interpolate(state.units,previous?.units)};
-    view.render(frame,time,frame.players.find(f=>f.id===self));
+    const frame=frameAt(now,dt);
+    view.render(frame,frame.time,frame.players.find(f=>f.id===self),dt);
     drawLabels(frame);
   }
   requestAnimationFrame(render);
 }
 
 function accept(state){
-  previous=!current || state.time<current.time || state.self!==current.self?null:current;
+  const offset=performance.now()-state.time;
+  if(!current || state.time<current.time || state.self!==current.self || offset-clockOffset>1250){
+    snapshots.length=0;
+    clockOffset=offset;
+    frameTime=null;
+  }else{
+    // Follow the low-latency edge of arrivals so late packets do not reset playback.
+    clockOffset=Math.min(offset,clockOffset+.18);
+  }
+  if(snapshots.at(-1)?.time===state.time) snapshots.pop();
+  snapshots.push(state);
+  if(snapshots.length>12) snapshots.shift();
   self=state.self;
   current=state;
-  receivedAt=performance.now();
   connected=true;
   refreshLabels([...state.players,...state.structures]);
   view?.drawMap(state,self);
@@ -252,12 +287,8 @@ async function connect(){
 }
 
 function startPractice(){
-  local.add(self,nickname+' · '+selectedRole,0,selectedRole);
-  const professions=['运营','测试','组长','运维','前台'];
-  for(let i=1;i<CAPACITY;i++){
-    const role=professions[(i-1)%professions.length];
-    local.add('bot'+i,role+' · 陪练 '+i,i,role,true);
-  }
+  local.addHuman(self,nickname+' · '+selectedRole,selectedRole);
+  local.fillTeams();
   $('practiceHelp').hidden=false;
   function tick(){
     local.tick(50);
@@ -296,6 +327,7 @@ function setIdeaOpen(open){
   document.title=arenaTitle;
   if (!selectedRole) $('roleDialog').showModal();
   else $('showIdea').focus();
+  frameTime=null;
 }
 
 function buildRolePicker(){
