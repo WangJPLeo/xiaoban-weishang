@@ -1,0 +1,32 @@
+game.js
+  s_c321ee639961f9::t_37ee2d322f1e5c 43-44,86,93,139-170,172-173,175-176,183-194,290-291
+  s_c321ee639961f9::t_875ecae7ee35a3 4,16-17,330
+arena.js
+  s_c321ee639961f9::t_37ee2d322f1e5c 174,180-195,197-210,459,465
+  s_c321ee639961f9::t_931a94a088bde0 196
+index.html
+  s_c321ee639961f9::t_37ee2d322f1e5c 33
+server.js
+  s_c321ee639961f9::t_37ee2d322f1e5c 53-56,58
+rift.js
+  s_c321ee639961f9::t_05dd704e808d41 235-251,253-255,257,259-272,274-277,279-310,312,340,357,365-378,380-402,405-464,466-470,472,476,479,488,491-493,498-501
+  s_c321ee639961f9::t_92e00583543c52 473
+说明.txt
+  s_c321ee639961f9::t_92e00583543c52 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "579d7da7ae2ee8c1745c1278ca356dec2689a5fe",
+  "prompts": {},
+  "sessions": {
+    "s_c321ee639961f9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf0d-c7a3-7bc0-892d-262bb302ecc1",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wangjipeng01 <wangjipeng01@zhuanzhuan.com>"
+    }
+  }
+}
