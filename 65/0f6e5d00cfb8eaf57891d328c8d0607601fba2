@@ -1,0 +1,28 @@
+arena.js
+  s_c321ee639961f9::t_751d1834d515ea 46,48-49,51-68,71,167-169,188,192,268-272,287,296,307-317,319-323,325-328,334-378,447,455-463,484,522-523,543,553
+  s_c321ee639961f9::t_00bb22269641a6 69-70
+game.js
+  s_c321ee639961f9::t_5ff45c2259794b 21,35-48,61-62,64-74,115,242,245-250
+rift.js
+  s_c321ee639961f9::t_5cc16000c4bd90 333-347,434-435,443-444,446-447,462-463,513-533,535
+style.css
+  s_c321ee639961f9::t_6aaa7b8bd188ee 129-134
+说明.txt
+  s_c321ee639961f9::t_ed8d7e494dfe67 18-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "650f6e5d00cfb8eaf57891d328c8d0607601fba2",
+  "prompts": {},
+  "sessions": {
+    "s_c321ee639961f9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf0d-c7a3-7bc0-892d-262bb302ecc1",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wangjipeng01 <wangjipeng01@zhuanzhuan.com>"
+    }
+  }
+}
