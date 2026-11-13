@@ -1,0 +1,19 @@
+arena.js
+  s_c321ee639961f9::t_3b82e8fb91448f 235-236
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a840ca41fc3bd1332242f5046e6904bd86ac5216",
+  "prompts": {},
+  "sessions": {
+    "s_c321ee639961f9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf0d-c7a3-7bc0-892d-262bb302ecc1",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wangjipeng01 <wangjipeng01@zhuanzhuan.com>"
+    }
+  }
+}
